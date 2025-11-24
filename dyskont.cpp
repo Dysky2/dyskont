@@ -16,17 +16,17 @@ int main() {
     srand(time(0));
 
     const double simulation_speed = 1.0;
-    const int simulation_time = 30;
+    const int simulation_time = 60;
 
     auto start = chrono::steady_clock::now();
     auto end_simulation = start + chrono::seconds( (int) (simulation_time / simulation_speed) );
 
     cout << "---------------------------------------" << endl;
     cout << "---    Dyskont otwraty zapraszamy   ---" << endl;
-    cout << "---------------------------------------" << endl;
+    cout << "---------------------------------------" << endl << endl;
 
     while(chrono::steady_clock::now() < end_simulation ) {
-        sleep(randomTime(4 / simulation_speed));
+        sleep(randomTime(8 / simulation_speed));
 
         int id=fork();
         if(id==-1) {
@@ -35,6 +35,7 @@ int main() {
         }
         if(id==0) {
             execl("./klient", "klient", NULL);
+            perror("execl failed");
             exit(0);
         }
 

@@ -1,0 +1,9 @@
+#Pliki wykonywalne
+*.exe
+*.out
+*.app
+
+*.o
+
+dyskont
+klient
