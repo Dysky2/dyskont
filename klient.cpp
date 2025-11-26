@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <string>
 #include <vector>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 using namespace std;
 
@@ -29,7 +32,7 @@ void generateProducts() {
         "RYBY"
     };
 
-    vector<vector<string>> products = {
+    const vector<vector<string>> products = {
         {"Jablko", "Banan", "Gruszka", "Truskawka", "Arbuz"},
         {"Marchew", "Ziemniak", "Pomidor", "Ogorek" },
         {"Chleb Razowy", "Bulka Kajzerka", "Bagietka"},
@@ -43,7 +46,6 @@ void generateProducts() {
     };
 
     int how_many_products = randomTimeWithRange(3, 11);
-
 
     vector<string> lista_produktow;
 
@@ -61,8 +63,10 @@ void generateProducts() {
 }
 
 
-int main() {
+int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
+
+    struct sembuf operacjaV = {0, -1, SEM_UNDO};
 
     int time = randomTime(10);
 
@@ -75,6 +79,8 @@ int main() {
     generateProducts();
 
     cout << "\nKlient wychodzi po " << time << " sekund" << endl;
+
+    semop(atoi(argv[1]), &operacjaV, 1);
 
     exit(0);
 }
