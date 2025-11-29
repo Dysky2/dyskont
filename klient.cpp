@@ -2,6 +2,7 @@
 #include <cstdlib> 
 #include <ctime> 
 #include <unistd.h>
+#include <sys/msg.h>
 
 #include "utils.h"
 
@@ -39,7 +40,11 @@ int main(int argc, char * argv[]) {
     sleep(time);
     // ten sleep powinien byc git po jakby wstrzymuje ten proces na iles
     
-    generateProducts();
+    // generateProducts();
+
+    klientWzor klient = {1, getpid(), 3, {"Pomidor", "Ananas", "Wino"}}; 
+
+    msgsnd(atoi(argv[2]), &klient, sizeof(klient) - sizeof(long), 0);
 
     cout << "\nKlient wychodzi po " << time << " sekund" << endl;
 

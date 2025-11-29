@@ -17,13 +17,20 @@ inline int checkError(int result, const char * msg) {
     return result;
 }
 
-int randomTime(int time) {
+inline int randomTime(int time) {
     return rand() % time; 
 }
 
-int randomTimeWithRange(int min, int max) {
+inline int randomTimeWithRange(int min, int max) {
     return rand() % (max - min + 1) + min; 
 }
+
+struct klientWzor {
+    long mtype;
+    int klient_id;
+    int ilosc_produktow;
+    char lista_produktow[10][20];
+};
 
 const std::string kategorieProduktow[10] = {
     "OWOCE",
