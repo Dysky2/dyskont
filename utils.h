@@ -32,6 +32,12 @@ struct klientWzor {
     char lista_produktow[10][20];
 };
 
+struct kasy {
+    int pid_kasy[8];
+    int status[8];
+    int liczba_ludzi[3];
+};
+
 const std::string kategorieProduktow[10] = {
     "OWOCE",
     "WARZYWA",

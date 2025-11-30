@@ -42,13 +42,13 @@ int main(int argc, char * argv[]) {
     
     // generateProducts();
 
-    klientWzor klient = {1, getpid(), 3, {"Pomidor", "Ananas", "Wino"}}; 
+    klientWzor klient = {2, getpid(), 3, {"Pomidor", "Ananas", "Wino"}}; 
 
     msgsnd(atoi(argv[2]), &klient, sizeof(klient) - sizeof(long), 0);
 
-    cout << "\nKlient wychodzi po " << time << " sekund" << endl;
+    cout << "Klient Idzie do kasy " << time << " sekund, jego pid: " << getpid() << endl;
 
-    checkError(semop(stoi(argv[1]), &operacjaP, 1), "Blad obnizenia semafora" );
+    // checkError(semop(stoi(argv[1]), &operacjaP, 1), "Blad obnizenia semafora" );
 
     exit(0);
 }
