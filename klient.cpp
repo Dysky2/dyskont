@@ -30,9 +30,14 @@ void generateProducts() {
 int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
 
-    struct sembuf operacjaP = {0, -1, SEM_UNDO};
+    int semid_klienci = atoi(argv[1]);
+    int shmid_kasy = atoi(argv[2]);
+    int msqid_kolejka = atoi(argv[3]);
 
-    int time = randomTime(10);
+    struct sembuf operacjaP = {0, 1, 0};
+    checkError( semop(semid_klienci, &operacjaP, 1), "Blad podniesienia semafora" );
+
+    int time = randomTime(4);
 
     cout << "Klient wchodzi do sklepu" << endl;
 
@@ -42,13 +47,13 @@ int main(int argc, char * argv[]) {
     
     // generateProducts();
 
-    klientWzor klient = {2, getpid(), 3, {"Pomidor", "Ananas", "Wino"}}; 
+    klientWzor klient = {1, getpid(), 3, {"Pomidor", "Ananas", "Wino"}}; 
 
-    msgsnd(atoi(argv[2]), &klient, sizeof(klient) - sizeof(long), 0);
+    checkError( msgsnd(msqid_kolejka, &klient, sizeof(klient) - sizeof(long), 0), "Blad wyslania wiadomosci od klienta"); 
 
     cout << "Klient Idzie do kasy " << time << " sekund, jego pid: " << getpid() << endl;
 
-    // checkError(semop(stoi(argv[1]), &operacjaP, 1), "Blad obnizenia semafora" );
+    // checkError(semop(semid_klienci, &operacjaP, 1), "Blad obnizenia semafora" );
 
     exit(0);
 }

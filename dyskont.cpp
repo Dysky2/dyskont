@@ -17,6 +17,7 @@ int main() {
     const double simulation_speed = 1.0;
     const int simulation_time = 30;
     const int startowa_ilosc_kas = 3;
+    int ilosc_otwratych_kas = 0;
 
     auto start = chrono::steady_clock::now();
     auto end_simulation = start + chrono::seconds( (int) (simulation_time / simulation_speed) );
@@ -27,7 +28,7 @@ int main() {
 
     // Ilczba klientow w sklepie
 	key_t key = ftok(".", 'A');
-    int semid = checkError( semget(key, 1, IPC_CREAT|0600), "Blad tworzenie semafora");
+    int semid_klienci = checkError( semget(key, 1, IPC_CREAT|0600), "Blad tworzenie semafora");
 
     // Pamiec dzielona dla kas
     key_t key_kasy = ftok(".", 'B');
@@ -43,34 +44,58 @@ int main() {
     for(int i=0;i<3;i++) {
         int pid = checkError( fork(), "Blad utowrzenia forka");
         if ( pid == 0 ) {
-            checkError( execl("./kasa", "kasa", to_string(shmId_kasy).c_str(), to_string(msqid_kolejka).c_str(), to_string(semid).c_str(), NULL) ,"Blad wywolania execa");
+            checkError( 
+                execl(
+                    "./kasa", "kasa", 
+                    to_string(semid_klienci).c_str(), 
+                    to_string(shmId_kasy).c_str(), 
+                    to_string(msqid_kolejka).c_str(),
+                    NULL
+                ),
+                "Blad wywolania execa"
+            );
         } else {
             if( i < startowa_ilosc_kas) {
                 lista_kas->pid_kasy[i] = pid;
                 lista_kas->status[i]= 1;
+                ilosc_otwratych_kas++;
             }
         }
     }
 
     while( chrono::steady_clock::now() < end_simulation ) {
-        sleep(randomTime(2 / simulation_speed));
+        sleep(randomTime(3 / simulation_speed));
 
         int id = checkError( fork() , "Blad forka");
         if(id==0) {
-            struct sembuf operacjaP = {0, 1, SEM_UNDO};
-            checkError( semop(semid, &operacjaP, 1), "Blad podniesienia semafora" );
-            cout << "WARTOSC SEMAFORA: " << semctl(semid, 0, GETVAL) << endl;
-            checkError( execl("./klient", "klient", to_string(semid).c_str(), to_string(msqid_kolejka).c_str(), NULL), "Blad exec" );
-        } 
+            checkError( 
+                execl("./klient", "klient", 
+                    to_string(semid_klienci).c_str(), 
+                    to_string(shmId_kasy).c_str(), 
+                    to_string(msqid_kolejka).c_str(), 
+                    NULL
+                ), 
+                "Blad exec" 
+            );
+        } else {
+            checkError( waitpid(-1, NULL, WNOHANG), "Bledne zebranie dziecka");
+        }
+
+        cout << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << endl;
     }
 
+    // czekanie az klienci opuszcza sklep
+    while (semctl(semid_klienci, 0, GETVAL) > 0) {
+        cout << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << endl;
+        sleep(2);
+    }
 
     // Wyslanie wiadomosci o zamkniecie kas
     for(int i=0; i < 8;i++) {
         if(lista_kas->status[i] == 1) {
             klientWzor klient;
             klient.mtype=1;
-            klient.klient_id=10;
+            klient.klient_id=-1;
             klient.ilosc_produktow=-1;
 
             msgsnd(msqid_kolejka, &klient, sizeof(klient)- sizeof(long), 0);
@@ -89,7 +114,7 @@ int main() {
 
     chrono::duration<double, milli> elapsed = end - start;
 
-    checkError(semctl(semid, 0, IPC_RMID), "Blad zamknieca semfora");
+    checkError(semctl(semid_klienci, 0, IPC_RMID), "Blad zamknieca semfora");
     checkError(msgctl(msqid_kolejka, IPC_RMID, NULL), "Blad zamknieca kolejki komunikatow");
     checkError( shmctl(shmId_kasy, IPC_RMID, NULL), "Blad zamkniecia pamieci dzielonj");
 
