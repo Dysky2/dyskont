@@ -40,6 +40,17 @@ int main() {
     key_t key_kolejka = ftok(".", 'C');
     int msqid_kolejka = checkError( msgget(key_kolejka, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
+    // TODO Przerobić na pamiec wspóldzielona na semaforach
+
+    // kolejka do kasy stacjonarnej_1
+    key_t key_kolejka_stac1 = ftok(".", 'D');
+    int msqid_kolejka_stac1 = checkError( msgget(key_kolejka_stac1, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
+
+    // kolejka do kas stacjonarnej_2
+    key_t key_kolejka_stac2 = ftok(".", 'E');
+    int msqid_kolejka_stac2 = checkError( msgget(key_kolejka_stac2, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
+
+
     cout << "Otwieram kasy samoobsługowe" << endl;
     for(int i=0;i<3;i++) {
         int pid = checkError( fork(), "Blad utowrzenia forka");
@@ -73,6 +84,8 @@ int main() {
                     to_string(semid_klienci).c_str(), 
                     to_string(shmId_kasy).c_str(), 
                     to_string(msqid_kolejka).c_str(), 
+                    to_string(msqid_kolejka_stac1).c_str(), 
+                    to_string(msqid_kolejka_stac2).c_str(), 
                     NULL
                 ), 
                 "Blad exec" 

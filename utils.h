@@ -5,8 +5,11 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/sem.h>
+#include <sys/shm.h>
+#include <sys/msg.h>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 inline int checkError(int result, const char * msg) {
     if (result == -1) {

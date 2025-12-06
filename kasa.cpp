@@ -1,7 +1,5 @@
 #include <iostream>
 #include <unistd.h>
-#include <sys/msg.h>
-#include <sys/shm.h>
 
 #include "utils.h"
 
@@ -12,7 +10,7 @@ int main(int argc, char * argv[]) {
 
     int semid_klienci = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
-    int msqid_kolejka = atoi(argv[3]);
+    int msqid_kolejka_samo = atoi(argv[3]);
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL , 0);
 
@@ -27,7 +25,7 @@ int main(int argc, char * argv[]) {
     
     while(1) {
         klientWzor klient;
-        checkError( msgrcv(msqid_kolejka, &klient, sizeof(klient) - sizeof(long), -2, 0), "Blad odebrania wiadomosci" );
+        checkError( msgrcv(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long), -2, 0), "Blad odebrania wiadomosci" );
 
         if (klient.ilosc_produktow == -1 || klient.klient_id == getpid()) {
             break;

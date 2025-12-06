@@ -1,9 +1,6 @@
 #include <iostream>
 #include <cstdlib> 
 #include <ctime> 
-#include <unistd.h>
-#include <sys/shm.h>
-#include <sys/msg.h>
 
 #include "utils.h"
 
@@ -34,6 +31,8 @@ int main(int argc, char * argv[]) {
     int semid_klienci = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka = atoi(argv[3]);
+    int msqid_kolejka_stac1 = atoi(argv[4]);
+    int msqid_kolejka_stac2 = atoi(argv[5]);
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
 
