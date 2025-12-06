@@ -32,6 +32,7 @@ struct klientWzor {
     long mtype;
     int klient_id;
     int ilosc_produktow;
+    int nrKasy;
     char lista_produktow[10][20];
 };
 
@@ -40,6 +41,23 @@ struct kasy {
     int status[8];
     int liczba_ludzi[3];
 };
+
+union semun {
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+    struct seminfo *__buf;
+};
+
+inline void zmien_wartosc_kolejki(int semid, kasy * lista_kas, int nrKolejki, int operacja) {
+    struct sembuf OperacjaP = {0, -1, SEM_UNDO};
+    checkError( semop(semid, &OperacjaP, 1), "Blad obnizenia semafora" );
+
+    lista_kas->liczba_ludzi[nrKolejki] += operacja;
+
+    struct sembuf OperacjaV = {0, 1, SEM_UNDO};
+    checkError( semop(semid, &OperacjaV, 1), "Blad podniesienia semafora" );
+}
 
 const std::string kategorieProduktow[10] = {
     "OWOCE",

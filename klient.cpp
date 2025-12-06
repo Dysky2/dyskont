@@ -6,6 +6,8 @@
 
 using namespace std;
 
+void sigalrm_handler(int sig) { }
+
 void generateProducts() {
     int how_many_products = randomTimeWithRange(3, 11);
 
@@ -30,9 +32,10 @@ int main(int argc, char * argv[]) {
 
     int semid_klienci = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
-    int msqid_kolejka = atoi(argv[3]);
+    int msqid_kolejka_samo = atoi(argv[3]);
     int msqid_kolejka_stac1 = atoi(argv[4]);
     int msqid_kolejka_stac2 = atoi(argv[5]);
+    int semid_kolejki = atoi(argv[6]);
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
 
@@ -48,13 +51,45 @@ int main(int argc, char * argv[]) {
     // ten sleep powinien byc git po jakby wstrzymuje ten proces na iles
     
     // generateProducts();
+    
+    int startoweId = msqid_kolejka_samo;
+    int startowyNr = 0;
 
-    klientWzor klient = {1, getpid(), 3, {"Pomidor", "Ananas", "Wino"}}; 
+    bool stac1 = lista_kas->status[6] == 1;
+    bool stac2 = lista_kas->status[7] == 1;
 
-    checkError( msgsnd(msqid_kolejka, &klient, sizeof(klient) - sizeof(long), 0), "Blad wyslania wiadomosci od klienta"); 
+    if((stac1 || stac2) && randomTimeWithRange(1, 100) > 95) {
+        if(stac1 && stac2) {
+            int num = randomTimeWithRange(1,2);
+            if(num == 1) {
+                startoweId = msqid_kolejka_stac1;
+                startowyNr = 1;
+            } else {
+                startoweId = msqid_kolejka_stac2;
+                startowyNr = 2;
+            }
+        } else if(stac1) {
+            startoweId = msqid_kolejka_stac1;
+            startowyNr = 1;
+        } else if (stac2) {
+            startoweId = msqid_kolejka_stac2;
+            startowyNr = 2;
+        }
+    }
 
-    cout << "Klient Idzie do kasy " << time << " sekund, jego pid: " << getpid() << endl;
-    lista_kas->liczba_ludzi[0]++;
+    klientWzor klient = {getpid(), getpid(), 3, startowyNr, {"Pomidor", "Ananas", "Wino"}};
+    alarm(10);
+
+    zmien_wartosc_kolejki(semid_kolejki, lista_kas, startowyNr, 1);
+
+    int status = msgsnd(startoweId, &klient, sizeof(klientWzor) - sizeof(long int), 0);
+    cout << "Klient " << getpid() << " staje do kolejki " << startowyNr << endl;
+
+    if(status != -1) {
+        cout << "Klient idzie do kasy o nr: " << startowyNr << endl;
+    }
+
+    cout << "WARTOSC SEMAFORA W KLIENT: " << semctl(semid_klienci, 0, GETVAL) << endl;
 
     exit(0);
 }

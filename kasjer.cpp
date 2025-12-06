@@ -12,6 +12,7 @@ int main(int argc, char * argv[]) {
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_stac1 = atoi(argv[3]);
     int msqid_kolejka_stac2 = atoi(argv[4]);
+    int semid_kolejki = atoi(argv[5]);
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
 
@@ -30,7 +31,9 @@ int main(int argc, char * argv[]) {
 
         cout << "ODEBRANO KOMUNIKAT " << klient.klient_id << " Z TEJ STRONY: " << getpid() << endl;
         sleep(randomTime(4));
-        cout << "Klient wychodzi ze sklepu" << endl;
+        cout << "Klient OD KASJERA wychodzi ze sklepu" << endl;
+
+        zmien_wartosc_kolejki(semid_kolejki, lista_kas, klient.nrKasy , -1);
 
         cout << "WARTOSC SEMAFORA W KASIE - 1: " << semctl(semid_klienci, 0, GETVAL) << endl;       
         struct sembuf operacjaP = {0, -1, 0};
