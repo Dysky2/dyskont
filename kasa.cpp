@@ -32,9 +32,10 @@ int main(int argc, char * argv[]) {
         if (klient.ilosc_produktow == -1 || klient.klient_id == getpid()) {
             break;
         }
+        lista_kas->liczba_ludzi[0]--;
 
         cout << "ODEBRANO KOMUNIKAT " << klient.klient_id << " Z TEJ STRONY: " << getpid() << endl;
-        sleep(2);
+        sleep(5);
         cout << "Klient wychodzi ze sklepu" << endl;
 
         cout << "WARTOSC SEMAFORA W KASIE - 1: " << semctl(semid_klienci, 0, GETVAL) << endl;       
@@ -42,7 +43,6 @@ int main(int argc, char * argv[]) {
         checkError( semop(semid_klienci, &operacjaP, 1 ), "Blad obnizenia semafora" );
         cout << "WARTOSC SEMAFORA W KASIE - 2: " << semctl(semid_klienci, 0, GETVAL) << endl;   
     }
-
 
     cout << "Koniec kasy " << endl;
     exit(0);

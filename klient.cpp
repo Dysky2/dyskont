@@ -2,6 +2,7 @@
 #include <cstdlib> 
 #include <ctime> 
 #include <unistd.h>
+#include <sys/shm.h>
 #include <sys/msg.h>
 
 #include "utils.h"
@@ -34,10 +35,12 @@ int main(int argc, char * argv[]) {
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka = atoi(argv[3]);
 
+    kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
+
     struct sembuf operacjaP = {0, 1, 0};
     checkError( semop(semid_klienci, &operacjaP, 1), "Blad podniesienia semafora" );
 
-    int time = randomTime(4);
+    int time = randomTime(6);
 
     cout << "Klient wchodzi do sklepu" << endl;
 
@@ -52,8 +55,7 @@ int main(int argc, char * argv[]) {
     checkError( msgsnd(msqid_kolejka, &klient, sizeof(klient) - sizeof(long), 0), "Blad wyslania wiadomosci od klienta"); 
 
     cout << "Klient Idzie do kasy " << time << " sekund, jego pid: " << getpid() << endl;
-
-    // checkError(semop(semid_klienci, &operacjaP, 1), "Blad obnizenia semafora" );
+    lista_kas->liczba_ludzi[0]++;
 
     exit(0);
 }

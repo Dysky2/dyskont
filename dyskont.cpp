@@ -64,7 +64,7 @@ int main() {
     }
 
     while( chrono::steady_clock::now() < end_simulation ) {
-        sleep(randomTime(3 / simulation_speed));
+        sleep(randomTime(2 / simulation_speed));
 
         int id = checkError( fork() , "Blad forka");
         if(id==0) {
@@ -81,7 +81,50 @@ int main() {
             checkError( waitpid(-1, NULL, WNOHANG), "Bledne zebranie dziecka");
         }
 
+        // 5 10 15
+        if(semctl(semid_klienci, 0, GETVAL) < 5 * (ilosc_otwratych_kas - 3)) {
+            cout << "ZAMYKAM KASE " << endl << endl;;
+            for(int i=6;i> 0;i--) {
+                if(lista_kas->status[i] == 1) {
+                    klientWzor klient = {2, lista_kas->pid_kasy[i], -1};
+                    lista_kas->status[i]=0;
+                    lista_kas->pid_kasy[i]=0;
+                    msgsnd(msqid_kolejka, &klient, sizeof(klient)-sizeof(long), 0);
+                    ilosc_otwratych_kas--;
+                    break;
+                }
+            }
+        }
+
+        // 15 20 25
+        if (semctl(semid_klienci, 0, GETVAL) >= ilosc_otwratych_kas * 5 && ilosc_otwratych_kas <= 5) {
+            int pid = checkError( fork(), "Blad utowrzenia forka");
+            if ( pid == 0 ) {
+                checkError( 
+                    execl(
+                        "./kasa", "kasa", 
+                        to_string(semid_klienci).c_str(), 
+                        to_string(shmId_kasy).c_str(), 
+                        to_string(msqid_kolejka).c_str(), 
+                        NULL
+                    ),
+                    "Blad wywolania execa"
+                );
+            } else {
+                for(int i=0;i<6;i++) {
+                    if (lista_kas->status[i] == 0) {
+                        lista_kas->pid_kasy[i] = pid;
+                        lista_kas->status[i] = 1;
+                        ilosc_otwratych_kas++;
+                        break;
+                    }
+                }
+            }
+        }
+
         cout << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << endl;
+
+        cout << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[0] << endl;
     }
 
     // czekanie az klienci opuszcza sklep
@@ -98,10 +141,12 @@ int main() {
             klient.klient_id=-1;
             klient.ilosc_produktow=-1;
 
-            msgsnd(msqid_kolejka, &klient, sizeof(klient)- sizeof(long), 0);
+            checkError( 
+                msgsnd(msqid_kolejka, &klient, sizeof(klient)- sizeof(long), 0), 
+                "Blad wyslania wiadomosci od klienta"
+            );
         }
     }
-
 
     // Czekam az wszyscy klienci zakoncza zakupy
     while (wait(NULL) > 0) {}
@@ -110,15 +155,9 @@ int main() {
         checkError(-1, "Blad czekania na klientwo");
     }
 
-    auto end = chrono::steady_clock::now();
-
-    chrono::duration<double, milli> elapsed = end - start;
-
     checkError(semctl(semid_klienci, 0, IPC_RMID), "Blad zamknieca semfora");
     checkError(msgctl(msqid_kolejka, IPC_RMID, NULL), "Blad zamknieca kolejki komunikatow");
     checkError( shmctl(shmId_kasy, IPC_RMID, NULL), "Blad zamkniecia pamieci dzielonj");
-
-    cout << "Czas wykonania: " << elapsed.count() << endl;
 
     return 0;
 }
