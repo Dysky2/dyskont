@@ -10,24 +10,33 @@ volatile sig_atomic_t stop_loop = 0;
 
 void sigalrm_handler(int sig) { }
 
-void generateProducts() {
-    int how_many_products = randomTimeWithRange(3, 11);
+// Generuje miedzy 3-10 produktów z 10 kategori i przypisuje do wskaznika na strukture Klient
+// Wpisuje ilosc_produków i liste
+int generateProducts(Klient *klient){
+    int how_many_products = randomTimeWithRange(3, 10);
 
-    vector<string> lista_produktow;
+    klient->ilosc_produktow = how_many_products;
 
+    const char *lista_produktow[how_many_products];
     for(int i=0; i<how_many_products;i++) {
         int ran = randomTime(10);
-        lista_produktow.push_back(products[ran][randomTime(products[ran].size())]);
+        lista_produktow[i] = products[ran][randomTime(products[ran].size())].data();
     }
 
-    cout << "Klient idzie do kasy z produktami: ";
-    for( auto x: lista_produktow) {
-        cout << x << ", ";
-    }
+    int offset = 0;
+    for(int i=0;i < how_many_products; i++) {
+        int len = strlen(lista_produktow[i]) + 1;
 
-    lista_produktow.clear();
+        if(offset + len > MAX_DATA_SIZE) {
+            perror("Za duzo danych");
+            break;
+        }
+
+        strcpy(klient->lista_produktow + offset, lista_produktow[i]);
+        offset += len;
+    }
+    return offset;
 }
-
 
 int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
@@ -82,11 +91,12 @@ int main(int argc, char * argv[]) {
     int aktualneId = startoweId;
     int aktualnyNr = startowyNr;
 
-    klientWzor klient = {1 , getpid(), 3, aktualnyNr, {"Pomidor", "Ananas", "Wino"}};
+    Klient klient = {1 , getpid(), aktualnyNr};
+    int offset = generateProducts(&klient);
     
     // alarm(10);
     zmien_wartosc_kolejki(semid_kolejki, lista_kas, aktualnyNr, 1);
-    int status = msgsnd(startoweId, &klient, sizeof(klientWzor) - sizeof(long int), 0);
+    int status = msgsnd(startoweId, &klient, sizeof(int) * 3 + offset, 0);
     komunikat << "Klient " << getpid() << " staje do kolejki " << aktualnyNr << "\n"; 
 
     if(status != -1) {
@@ -102,7 +112,7 @@ int main(int argc, char * argv[]) {
     while (1) {
         alarm(10);
 
-        klientWzor odebrany;
+        Klient odebrany;
         int rcvStatus = msgrcv(aktualneId, &odebrany, sizeof(klient) - sizeof(long int), getpid(), 0);
 
         if(rcvStatus != -1) {

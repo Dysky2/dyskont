@@ -26,15 +26,32 @@ int main(int argc, char * argv[]) {
 
     
     while(1) {
-        klientWzor klient;
+        Klient klient;
         checkError( msgrcv(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long int), 1, 0), "Blad odebrania wiadomosci" );
         
         if (klient.ilosc_produktow == -1 || klient.klient_id == getpid()) {
             break;
         }
-
-        komunikat << "ODEBRANO KOMUNIKAT " << klient.klient_id << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
         sleep(randomTime(15));
+
+        komunikat << "ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
+
+        int aktualna_pozycja = 0;
+        stringstream bufor;
+        for(int i=0;i < klient.ilosc_produktow;i++) {
+            char * produkt = klient.lista_produktow + aktualna_pozycja;
+            if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  
+                strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
+                    // dodac obłsuge 
+            }
+            bufor << produkt;
+            if (i < klient.ilosc_produktow - 1) {
+                bufor << ", ";
+            }
+
+            aktualna_pozycja += strlen(produkt) + 1;
+        }
+        komunikat << bufor.str() << "\n";
 
         if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
             komunikat << "KASA probuje odjac z kolejki gdzie jest 0" << "\n" << "\n"; 

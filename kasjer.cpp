@@ -16,7 +16,7 @@ int main(int argc, char * argv[]) {
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
 
     while(1) {
-        klientWzor klient;
+        Klient klient;
 
         alarm(30);  
 
@@ -27,10 +27,25 @@ int main(int argc, char * argv[]) {
         if(klient.ilosc_produktow == -1 || klient.klient_id==getpid() || errno == EINTR) {
             break;
         }
-
-        komunikat << "ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
         sleep(randomTime(15));
-        komunikat << "Klient OD KASJERA wychodzi ze sklepu" << "\n";
+        
+        komunikat << "ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
+        int aktualna_pozycja = 0;
+        stringstream bufor;
+        for(int i=0;i < klient.ilosc_produktow;i++) {
+            char * produkt = klient.lista_produktow + aktualna_pozycja;
+            if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  
+                strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
+                    // dodac obłsuge 
+            }
+            bufor << produkt;
+            if (i < klient.ilosc_produktow - 1) {
+                bufor << ", ";
+            }
+
+            aktualna_pozycja += strlen(produkt) + 1;
+        }
+        komunikat << bufor.str() << "\n";
 
         if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
             komunikat << "KASJER probuje odjac z kolejki gdzie jest 0" << "\n" << "\n";

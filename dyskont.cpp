@@ -3,9 +3,6 @@
 #include <ctime>
 #include <chrono>
 #include <iomanip>
-#include <unistd.h>
-#include <sys/shm.h>
-#include <sys/msg.h>
 
 #include "utils.h"
 
@@ -144,7 +141,8 @@ int main() {
             komunikat << "ZAMYKAM KASE " << "\n" << "\n";
             for(int i=6;i> 0;i--) {
                 if(lista_kas->status[i] == 1) {
-                    klientWzor klient = {lista_kas->pid_kasy[i], lista_kas->pid_kasy[i], -1};
+                    Klient klient = {2, lista_kas->pid_kasy[i]};
+                    klient.ilosc_produktow = -1;
                     lista_kas->status[i]=0;
                     lista_kas->pid_kasy[i]=0;
                     msgsnd(msqid_kolejka_samo, &klient, sizeof(klient)-sizeof(long), 0);
@@ -209,7 +207,8 @@ int main() {
             rcvId = msqid_kolejka_stac2;
         }
         if(lista_kas->status[i] == 1) {
-            klientWzor klient = {1, -1, -1};
+            Klient klient = {1, -1};
+            klient.ilosc_produktow = -1;
             checkError( 
                 msgsnd(rcvId, &klient, sizeof(klient)- sizeof(long), 0) , 
                 "Blad wyslania wiadomosci od klienta"

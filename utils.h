@@ -11,6 +11,9 @@
 #include <vector>
 #include <unistd.h>
 #include <sstream>
+#include <cstring>
+
+#define MAX_DATA_SIZE 200
 
 const double simulation_speed = 1.0;
 const int simulation_time = 10;
@@ -50,12 +53,12 @@ struct AtomicLogger {
 
 #define komunikat AtomicLogger()
 
-struct klientWzor {
+struct Klient {
     long mtype;
     int klient_id;
-    int ilosc_produktow;
     int nrKasy;
-    char lista_produktow[10][20];
+    int ilosc_produktow;
+    char lista_produktow[MAX_DATA_SIZE];
 };
 
 struct kasy {
