@@ -5,7 +5,7 @@
 using namespace std;
 
 int main(int argc, char * argv[]) {
-    cout << "Otwieram kase stacjonarna " << getpid() << endl << endl;
+    komunikat << "Otwieram kase stacjonarna " << getpid() << "\n";
 
     int semid_klienci = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
@@ -20,7 +20,7 @@ int main(int argc, char * argv[]) {
 
         alarm(30);  
 
-        msgrcv(msqid_kolejka_stac1, &klient, sizeof(klient) - sizeof(long), 0, 0);
+        msgrcv(msqid_kolejka_stac1, &klient, sizeof(klient) - sizeof(long), 1, 0);
 
         alarm(0);
     
@@ -28,12 +28,12 @@ int main(int argc, char * argv[]) {
             break;
         }
 
-        cout << "ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << endl;
+        komunikat << "ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
         sleep(randomTime(15));
-        cout << "Klient OD KASJERA wychodzi ze sklepu" << endl;
+        komunikat << "Klient OD KASJERA wychodzi ze sklepu" << "\n";
 
         if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
-            cout << "KASJER probuje odjac z kolejki gdzie jest 0" << endl << endl;
+            komunikat << "KASJER probuje odjac z kolejki gdzie jest 0" << "\n" << "\n";
         } else {
             zmien_wartosc_kolejki(semid_kolejki, lista_kas, klient.nrKasy , -1);
         }
@@ -44,8 +44,11 @@ int main(int argc, char * argv[]) {
             msgsnd(msqid_kolejka_stac1, &klient, sizeof(klient) - sizeof(long int), 0);
         }
 
+        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[0] << "\n";
+        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[1] << "\n";
+        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[2] << "\n";
     }
 
-    cout << "Zamykam kase stacjonarna: " << getpid() << endl << endl;
+    komunikat << "Zamykam kase stacjonarna: " << getpid() << "\n" << "\n";
     exit(0);
 }

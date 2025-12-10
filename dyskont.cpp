@@ -14,7 +14,7 @@ using namespace std;
 int main() {
     srand(time(0));
 
-    cout << "Pid dyskontu: " << getpid() << endl;
+    komunikat << "Pid dyskontu: " << getpid() << "\n";
 
     const double simulation_speed = 1.0;
     const int simulation_time = 60;
@@ -24,9 +24,10 @@ int main() {
     auto start = chrono::steady_clock::now();
     auto end_simulation = start + chrono::seconds( (int) (simulation_time / simulation_speed) );
 
-    cout << "---------------------------------------" << endl;
-    cout << "---    Dyskont otwraty zapraszamy   ---" << endl;
-    cout << "---------------------------------------" << endl << endl;
+
+    komunikat << "---------------------------------------" << "\n";
+    komunikat << "---    Dyskont otwraty zapraszamy   ---" << "\n";
+    komunikat << "---------------------------------------" << "\n\n";
 
     // Ilczba klientow w sklepie
 	key_t key = ftok(".", 'A');
@@ -140,7 +141,7 @@ int main() {
 
         // 5 10 15
         if(semctl(semid_klienci, 0, GETVAL) < 5 * (ilosc_otwratych_kas - 3)) {
-            cout << "ZAMYKAM KASE " << endl << endl;;
+            komunikat << "ZAMYKAM KASE " << "\n" << "\n";
             for(int i=6;i> 0;i--) {
                 if(lista_kas->status[i] == 1) {
                     klientWzor klient = {lista_kas->pid_kasy[i], lista_kas->pid_kasy[i], -1};
@@ -184,21 +185,21 @@ int main() {
                 }
             }
         }
-        cout << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << endl;
+        komunikat << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << "\n";
 
-        cout << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[0] << endl;
-        cout << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[1] << endl;
-        cout << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[2] << endl;
+        komunikat << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[0] << "\n";
+        komunikat << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[1] << "\n";
+        komunikat << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[2] << "\n";
     }
 
     // czekanie az klienci opuszcza sklep
     while (semctl(semid_klienci, 0, GETVAL) > 0) {
-        cout << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << endl;
+        komunikat << "Ilosc ludzi w kolejce IN SEM " << semctl(semid_klienci, 0, GETVAL) << "\n";
         sleep(2);
     }
 
     // Wyslanie wiadomosci o zamkniecie kas
-    cout << "WYLACZENIE KAS" << endl;
+    komunikat << "WYLACZENIE KAS" << "\n";
     for(int i=0; i < 8;i++) {
         int rcvId = msqid_kolejka_samo;
         if(i == 6) {

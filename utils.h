@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <unistd.h>
+#include <sstream>
 
 const double simulation_speed = 1.0;
 const int simulation_time = 10;
@@ -30,6 +31,24 @@ inline int randomTime(int time) {
 inline int randomTimeWithRange(int min, int max) {
     return rand() % (max - min + 1) + min; 
 }
+
+struct AtomicLogger {
+    std::stringstream bufor;
+
+    ~AtomicLogger() {
+        // bufor << "\n";
+        std::string tresc = bufor.str();
+        write(1, tresc.c_str(), tresc.length());
+    }
+
+    template<typename T>
+    AtomicLogger& operator<<(const T& wartosc) {
+        bufor << wartosc;
+        return *this;
+    }
+};
+
+#define komunikat AtomicLogger()
 
 struct klientWzor {
     long mtype;

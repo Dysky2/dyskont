@@ -5,7 +5,7 @@
 using namespace std;
 
 int main(int argc, char * argv[]) {
-    cout << "Tutaj kasa witam" << endl;
+    komunikat << "Tutaj kasa witam" << "\n";
 
     int semid_klienci = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
@@ -14,13 +14,15 @@ int main(int argc, char * argv[]) {
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL , 0);
 
+    stringstream bufor;
     for(int i=0;i<8;i++) {
-        cout << lista_kas->pid_kasy[i] << " ";
+        bufor << lista_kas->pid_kasy[i] << " ";
     }
     for(int i=0;i<8;i++) {
-        cout << lista_kas->status[i] << " ";
+        bufor << lista_kas->status[i] << " ";
     }
-    cout << endl;
+    bufor << "\n";
+    komunikat << bufor.str();
 
     
     while(1) {
@@ -31,11 +33,11 @@ int main(int argc, char * argv[]) {
             break;
         }
 
-        cout << "ODEBRANO KOMUNIKAT " << klient.klient_id << " O tymie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << endl;
+        komunikat << "ODEBRANO KOMUNIKAT " << klient.klient_id << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
         sleep(randomTime(15));
 
         if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
-            cout << "KASA probuje odjac z kolejki gdzie jest 0" << endl << endl;
+            komunikat << "KASA probuje odjac z kolejki gdzie jest 0" << "\n" << "\n"; 
         } else {
             zmien_wartosc_kolejki(semid_kolejki, lista_kas, klient.nrKasy , -1);
         }
@@ -46,12 +48,12 @@ int main(int argc, char * argv[]) {
             msgsnd(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long int), 0);
         }
 
-        cout << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[0] << endl;
-        cout << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[1] << endl;
-        cout << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[2] << endl;
+        komunikat << "Ilosc ludzi w kolejce OD KASY " << lista_kas->liczba_ludzi[0] << "\n";
+        komunikat << "Ilosc ludzi w kolejce OD KASY " << lista_kas->liczba_ludzi[1] << "\n";
+        komunikat << "Ilosc ludzi w kolejce OD KASY " << lista_kas->liczba_ludzi[2] << "\n";
   
     }
 
-    cout << "Koniec kasy " << endl;
+    komunikat << "Koniec kasy " << "\n";
     exit(0);
 }

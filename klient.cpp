@@ -46,12 +46,10 @@ int main(int argc, char * argv[]) {
     struct sembuf operacjaV = {0, 1, 0};
     checkError( semop(semid_klienci, &operacjaV, 1), "Blad podniesienia semafora" );
 
-    int time = randomTime(10);
-
-    cout << "Klient wchodzi do sklepu" << endl;
-
+    komunikat << "Klient wchodzi do sklepu" << "\n";
+    
     // ILES CZASU JEST W SKLEPIE 
-    sleep(time);
+    sleep(randomTime(20));
     // ten sleep powinien byc git po jakby wstrzymuje ten proces na iles
     
     // generateProducts();
@@ -81,19 +79,25 @@ int main(int argc, char * argv[]) {
         }
     }
 
-    klientWzor klient = {1 , getpid(), 3, startowyNr, {"Pomidor", "Ananas", "Wino"}};
-
     int aktualneId = startoweId;
     int aktualnyNr = startowyNr;
+
+    klientWzor klient = {1 , getpid(), 3, aktualnyNr, {"Pomidor", "Ananas", "Wino"}};
     
     // alarm(10);
+    zmien_wartosc_kolejki(semid_kolejki, lista_kas, aktualnyNr, 1);
     int status = msgsnd(startoweId, &klient, sizeof(klientWzor) - sizeof(long int), 0);
-    cout << "Klient " << getpid() << " staje do kolejki " << startowyNr << endl;
+    komunikat << "Klient " << getpid() << " staje do kolejki " << aktualnyNr << "\n"; 
 
     if(status != -1) {
-        cout << "Klient idzie do kasy o nr: " << startowyNr << endl;
-        zmien_wartosc_kolejki(semid_kolejki, lista_kas, startowyNr, 1);
+        komunikat << "Klient idzie do kasy o nr: " << aktualnyNr << "\n";
+    } else {
+        zmien_wartosc_kolejki(semid_kolejki, lista_kas, aktualnyNr, -1);
     }
+
+    komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << lista_kas->liczba_ludzi[0] << "\n";
+    komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << lista_kas->liczba_ludzi[1] << "\n";
+    komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << lista_kas->liczba_ludzi[2] << "\n";
 
     while (1) {
         alarm(10);
@@ -102,11 +106,10 @@ int main(int argc, char * argv[]) {
         int rcvStatus = msgrcv(aktualneId, &odebrany, sizeof(klient) - sizeof(long int), getpid(), 0);
 
         if(rcvStatus != -1) {
-            cout << "ZAKUPY DOKONANE przez " << getpid() << " ILOSC PRODUKTÓW " << odebrany.ilosc_produktow << endl;
+             komunikat << "ZAKUPY DOKONANE przez " << getpid() << " ILOSC PRODUKTÓW " << odebrany.ilosc_produktow << "\n";
             // stop_loop = 1;
             break; 
         }
-
 
         if(errno == EINTR) {
             int doceloweIdKolejki = -1;
@@ -130,12 +133,11 @@ int main(int argc, char * argv[]) {
             if(docelowyNr != -1) {
                 // int mogeOpuscic = msgrcv(aktualneId, &klient, sizeof(klient) - sizeof(long int), getpid(), IPC_NOWAIT);
 
-                cout << "Sprawdzenie klienta " << klient.mtype << " " << klient.klient_id << endl;
+                komunikat << "Sprawdzenie klienta " << klient.mtype << " " << klient.klient_id << "\n";
                 // if( mogeOpuscic != -1) {
-
                     
                     if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
-                        cout << "KLIENT probuje odjac z kolejki gdzie jest 0" << endl << endl;  
+                        komunikat << "KLIENT probuje odjac z kolejki gdzie jest 0" << "\n" << "\n";
                     } else {
                         zmien_wartosc_kolejki(semid_kolejki, lista_kas, aktualnyNr, -1);
                     }
@@ -153,11 +155,11 @@ int main(int argc, char * argv[]) {
         }
     }
 
-    cout << "WARTOSC SEMAFORA W KASIE - 1: " << semctl(semid_klienci, 0, GETVAL) << endl;       
+    komunikat << "WARTOSC SEMAFORA- 1: " << semctl(semid_klienci, 0, GETVAL) << "\n";       
     struct sembuf operacjaP = {0, -1, 0};
     checkError( semop(semid_klienci, &operacjaP, 1 ), "Blad obnizenia semafora" );
-    cout << "WARTOSC SEMAFORA W KASIE - 2: " << semctl(semid_klienci, 0, GETVAL) << endl;
-    cout << "KONIEC KLIENTA" << endl << endl;
+    komunikat << "WARTOSC SEMAFORA- 2: " << semctl(semid_klienci, 0, GETVAL) << "\n";
+    komunikat << "KONIEC KLIENTA" << "\n" << "\n";
     
     exit(0);
 }
