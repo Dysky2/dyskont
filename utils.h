@@ -53,10 +53,29 @@ struct AtomicLogger {
 
 #define komunikat AtomicLogger()
 
+inline void wyswietl_produkty(char lista_produktow[], int ilosc_produktow) {
+    komunikat << "Klient idzie do kasy z produktami: "<< "\n";  
+    std::stringstream bufor;
+    int aktualna_pozycja = 0;
+    for(int i=0;i < ilosc_produktow;i++) {
+        char * produkt = lista_produktow + aktualna_pozycja;
+
+        bufor << produkt;
+        if (i < ilosc_produktow - 1) {
+            bufor << ", ";
+        }
+
+        aktualna_pozycja += strlen(produkt) + 1;
+    }
+    komunikat << bufor.str() << "\n";
+}
+
+
 struct Klient {
     long mtype;
     int klient_id;
     int nrKasy;
+    int wiek;
     int ilosc_produktow;
     char lista_produktow[MAX_DATA_SIZE];
 };
@@ -65,6 +84,14 @@ struct kasy {
     int pid_kasy[8];
     int status[8];
     int liczba_ludzi[3];
+};
+
+struct Obsluga {
+    long int mtype;
+    int powod; // 1 -> Sprawdzenie wieku, 2 -> popsuta kasa
+    int kasa_id;
+    int wiek_klienta;
+    int pelnoletni; // -1 -> osobo niepelnetnia 0 -> pelnoletni
 };
 
 union semun {

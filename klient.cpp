@@ -58,7 +58,7 @@ int main(int argc, char * argv[]) {
     komunikat << "Klient wchodzi do sklepu" << "\n";
     
     // ILES CZASU JEST W SKLEPIE 
-    sleep(randomTime(20));
+    sleep(randomTime(10));
     // ten sleep powinien byc git po jakby wstrzymuje ten proces na iles
     
     // generateProducts();
@@ -92,11 +92,12 @@ int main(int argc, char * argv[]) {
     int aktualnyNr = startowyNr;
 
     Klient klient = {1 , getpid(), aktualnyNr};
-    int offset = generateProducts(&klient);
+    klient.wiek = randomTimeWithRange(8, 50);
+    int dlugosc_tekstu = generateProducts(&klient);
     
     // alarm(10);
     zmien_wartosc_kolejki(semid_kolejki, lista_kas, aktualnyNr, 1);
-    int status = msgsnd(startoweId, &klient, sizeof(int) * 3 + offset, 0);
+    int status = msgsnd(startoweId, &klient, sizeof(int) * 4 + dlugosc_tekstu, 0);
     komunikat << "Klient " << getpid() << " staje do kolejki " << aktualnyNr << "\n"; 
 
     if(status != -1) {
@@ -154,7 +155,7 @@ int main(int argc, char * argv[]) {
                     zmien_wartosc_kolejki(semid_kolejki, lista_kas, docelowyNr, 1);
                     
                     klient.nrKasy=docelowyNr;
-                    status = msgsnd(doceloweIdKolejki, &klient, sizeof(klient) - sizeof(long int), 0);
+                    status = msgsnd(doceloweIdKolejki, &klient,  sizeof(int) * 4 + dlugosc_tekstu, 0);
                     cout << "Klient " << klient.klient_id << " zmienia kolejke na " << docelowyNr << endl;
 
                     aktualneId = doceloweIdKolejki;

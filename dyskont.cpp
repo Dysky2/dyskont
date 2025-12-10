@@ -14,7 +14,7 @@ int main() {
     komunikat << "Pid dyskontu: " << getpid() << "\n";
 
     const double simulation_speed = 1.0;
-    const int simulation_time = 60;
+    const int simulation_time = 30;
     const int startowa_ilosc_kas = 3;
     int ilosc_otwratych_kas = 0;
 
@@ -34,7 +34,7 @@ int main() {
     key_t key_kasy = ftok(".", 'B');
     int shmId_kasy = checkError( shmget(key_kasy, sizeof(kasy), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej");
 
-    key_t key_kolelejki = ftok(".", 'F');
+    key_t key_kolelejki = ftok(".", 'C');
     int semid_kolejki = checkError( semget(key_kolelejki, 1, IPC_CREAT|0600), "Blad tworzenie semafora");
 
     // Ustawienie wartosci semafora odrazu na 1 
@@ -53,19 +53,37 @@ int main() {
     }
 
     // kolejka do kas samoobsługowych
-    key_t key_kolejka = ftok(".", 'C');
+    key_t key_kolejka = ftok(".", 'D');
     int msqid_kolejka_samo = checkError( msgget(key_kolejka, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
     // kolejka do kasy stacjonarnej_1
-    key_t key_kolejka_stac1 = ftok(".", 'D');
+    key_t key_kolejka_stac1 = ftok(".", 'E');
     int msqid_kolejka_stac1 = checkError( msgget(key_kolejka_stac1, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
     // kolejka do kas stacjonarnej_2
-    key_t key_kolejka_stac2 = ftok(".", 'E');
+    key_t key_kolejka_stac2 = ftok(".", 'F');
     int msqid_kolejka_stac2 = checkError( msgget(key_kolejka_stac2, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
+    // kolejka do obsługi 
+    key_t key_kolejka_obsluga = ftok(".",'G');
+    int msqid_kolejka_obsluga = checkError( msgget(key_kolejka_obsluga, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
-    cout << "Otwieram kasy samoobsługowe" << endl;
+    komunikat << "Obsluga wchodzi do sklepu" << "\n";
+    int opid = checkError(fork(), "Blad utowrzenia forka");
+    if (opid == 0) {
+        checkError(
+            execl(
+                "./obsluga", 
+                "obsluga",
+                to_string(msqid_kolejka_obsluga).c_str(),
+                NULL
+            ),
+            "Blad wywolania execa"
+        );
+    }
+
+
+    komunikat << "Otwieram kasy samoobsługowe" << "\n";
     for(int i=0;i<3;i++) {
         int pid = checkError( fork(), "Blad utowrzenia forka");
         if ( pid == 0 ) {
@@ -76,6 +94,7 @@ int main() {
                     to_string(shmId_kasy).c_str(), 
                     to_string(msqid_kolejka_samo).c_str(),
                     to_string(semid_kolejki).c_str(), 
+                    to_string(msqid_kolejka_obsluga).c_str(),
                     NULL
                 ),
                 "Blad wywolania execa"
@@ -171,7 +190,8 @@ int main() {
                             to_string(semid_klienci).c_str(), 
                             to_string(shmId_kasy).c_str(), 
                             to_string(msqid_kolejka_samo).c_str(),
-                            to_string(semid_kolejki).c_str(),    
+                            to_string(semid_kolejki).c_str(),  
+                            to_string(msqid_kolejka_obsluga).c_str(),  
                             NULL
                         ),
                         "Blad wywolania execa"
@@ -216,6 +236,10 @@ int main() {
         }
     }
 
+    // Zakonczenie działania obłsugi
+    Obsluga obsluga = {1, -1, -1};
+    checkError( msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(obsluga) - sizeof(long int), 0), "Blad zamkniecia oblsugi" );
+
     // Czekam az wszyscy klienci zakoncza zakupy
     while (wait(NULL) > 0) {}
 
@@ -229,6 +253,6 @@ int main() {
     checkError( msgctl(msqid_kolejka_samo, IPC_RMID, NULL), "Blad zamkniecia kolejki_samoobslugowej" );
     checkError( msgctl(msqid_kolejka_stac1, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_1" );
     checkError( msgctl(msqid_kolejka_stac2, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
-
+    checkError( msgctl(msqid_kolejka_obsluga, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
     return 0;
 }
