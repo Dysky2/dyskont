@@ -45,13 +45,18 @@ int main() {
     semctl(semid_kolejki, 0, SETVAL, argument);
 
     kasy * lista_kas = (kasy *) shmat(shmId_kasy, NULL, 0);
-    lista_kas->liczba_ludzi[0] = 0;
+
+    for(int i=0; i<8; i++) {
+        if(i ==0 || i == 1 | i == 2) {
+            lista_kas->liczba_ludzi[i] = 0;
+        }
+        lista_kas->pid_kasy[i] = 0;
+        lista_kas->status[i] = 0;
+    }
 
     // kolejka do kas samoobsługowych
     key_t key_kolejka = ftok(".", 'C');
     int msqid_kolejka_samo = checkError( msgget(key_kolejka, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
-
-    // TODO Przerobić na pamiec wspóldzielona na semaforach
 
     // kolejka do kasy stacjonarnej_1
     key_t key_kolejka_stac1 = ftok(".", 'D');
@@ -79,7 +84,6 @@ int main() {
             );
         } else {
             if( i < startowa_ilosc_kas) {
-                // to powinna robic kasa.cpp w srodku u gory jak cos
                 lista_kas->pid_kasy[i] = pid;
                 lista_kas->status[i]= 1;
                 ilosc_otwratych_kas++;
@@ -151,31 +155,35 @@ int main() {
 
         // 15 20 25
         if (semctl(semid_klienci, 0, GETVAL) >= ilosc_otwratych_kas * 5 && ilosc_otwratych_kas <= 5) {
-            int pid = checkError( fork(), "Blad utowrzenia forka");
-            if ( pid == 0 ) {
-                checkError( 
-                    execl(
-                        "./kasa", "kasa", 
-                        to_string(semid_klienci).c_str(), 
-                        to_string(shmId_kasy).c_str(), 
-                        to_string(msqid_kolejka_samo).c_str(),
-                        to_string(semid_kolejki).c_str(),
-                        NULL
-                    ),
-                    "Blad wywolania execa"
-                );
-            } else {
-                for(int i=0;i<6;i++) {
-                    if (lista_kas->status[i] == 0) {
-                        lista_kas->pid_kasy[i] = pid;
-                        lista_kas->status[i] = 1;
-                        ilosc_otwratych_kas++;
-                        break;
-                    }
+
+            int wolny_status = -1;
+            for(int i =0;i <6;i++) {
+                if (lista_kas->status[i] == 0) {
+                    wolny_status = i;
+                    break;
+                }
+            }
+            if(wolny_status != -1) {
+                int pid = checkError( fork(), "Blad utowrzenia forka");
+                if ( pid == 0 ) {
+                    checkError( 
+                        execl(
+                            "./kasa", "kasa", 
+                            to_string(semid_klienci).c_str(), 
+                            to_string(shmId_kasy).c_str(), 
+                            to_string(msqid_kolejka_samo).c_str(),
+                            to_string(semid_kolejki).c_str(),    
+                            NULL
+                        ),
+                        "Blad wywolania execa"
+                    );
+                } else {
+                    lista_kas->pid_kasy[wolny_status] = pid;
+                    lista_kas->status[wolny_status] = 1;
+                    ilosc_otwratych_kas++;
                 }
             }
         }
-
         cout << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << endl;
 
         cout << "Ilosc ludzi w kolejce " << lista_kas->liczba_ludzi[0] << endl;

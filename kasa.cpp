@@ -25,21 +25,31 @@ int main(int argc, char * argv[]) {
     
     while(1) {
         klientWzor klient;
-        checkError( msgrcv(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long), 0, 0), "Blad odebrania wiadomosci" );
-
+        checkError( msgrcv(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long int), 1, 0), "Blad odebrania wiadomosci" );
+        
         if (klient.ilosc_produktow == -1 || klient.klient_id == getpid()) {
             break;
         }
 
-        cout << "ODEBRANO KOMUNIKAT " << klient.klient_id << " Z TEJ STRONY: " << getpid() << endl;
-        sleep(randomTime(8));
-        cout << "Klient wychodzi ze sklepu" << endl;
+        cout << "ODEBRANO KOMUNIKAT " << klient.klient_id << " O tymie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << endl;
+        sleep(randomTime(15));
 
-        zmien_wartosc_kolejki(semid_kolejki, lista_kas, klient.nrKasy , -1);
-        cout << "WARTOSC SEMAFORA W KASIE - 1: " << semctl(semid_klienci, 0, GETVAL) << endl;       
-        struct sembuf operacjaP = {0, -1, 0};
-        checkError( semop(semid_klienci, &operacjaP, 1 ), "Blad obnizenia semafora" );
-        cout << "WARTOSC SEMAFORA W KASIE - 2: " << semctl(semid_klienci, 0, GETVAL) << endl;   
+        if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
+            cout << "KASA probuje odjac z kolejki gdzie jest 0" << endl << endl;
+        } else {
+            zmien_wartosc_kolejki(semid_kolejki, lista_kas, klient.nrKasy , -1);
+        }
+
+        if(kill(klient.klient_id, 0) == 0) {
+            klient.mtype = klient.klient_id;
+            klient.ilosc_produktow = 300;
+            msgsnd(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long int), 0);
+        }
+
+        cout << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[0] << endl;
+        cout << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[1] << endl;
+        cout << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[2] << endl;
+  
     }
 
     cout << "Koniec kasy " << endl;

@@ -11,6 +11,9 @@
 #include <vector>
 #include <unistd.h>
 
+const double simulation_speed = 1.0;
+const int simulation_time = 10;
+
 inline int checkError(int result, const char * msg) {
     if (result == -1) {
         perror(msg);
