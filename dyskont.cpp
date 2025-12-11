@@ -14,7 +14,7 @@ int main() {
     komunikat << "Pid dyskontu: " << getpid() << "\n";
 
     const double simulation_speed = 1.0;
-    const int simulation_time = 30;
+    const int simulation_time = 120;
     const int startowa_ilosc_kas = 3;
     int ilosc_otwratych_kas = 0;
 
@@ -82,7 +82,6 @@ int main() {
         );
     }
 
-
     komunikat << "Otwieram kasy samoobsługowe" << "\n";
     for(int i=0;i<3;i++) {
         int pid = checkError( fork(), "Blad utowrzenia forka");
@@ -109,7 +108,7 @@ int main() {
     }
 
     while( chrono::steady_clock::now() < end_simulation ) {
-        sleep(randomTime(5 / simulation_speed));
+        sleep(randomTime(3 / simulation_speed));
 
         if (chrono::steady_clock::now() >= end_simulation) {
             break;

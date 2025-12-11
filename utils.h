@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <sstream>
 #include <cstring>
+#include <iomanip>
 
 #define MAX_DATA_SIZE 200
 
@@ -52,24 +53,6 @@ struct AtomicLogger {
 };
 
 #define komunikat AtomicLogger()
-
-inline void wyswietl_produkty(char lista_produktow[], int ilosc_produktow) {
-    komunikat << "Klient idzie do kasy z produktami: "<< "\n";  
-    std::stringstream bufor;
-    int aktualna_pozycja = 0;
-    for(int i=0;i < ilosc_produktow;i++) {
-        char * produkt = lista_produktow + aktualna_pozycja;
-
-        bufor << produkt;
-        if (i < ilosc_produktow - 1) {
-            bufor << ", ";
-        }
-
-        aktualna_pozycja += strlen(produkt) + 1;
-    }
-    komunikat << bufor.str() << "\n";
-}
-
 
 struct Klient {
     long mtype;
@@ -116,12 +99,25 @@ const std::string kategorieProduktow[10] = {
     "WARZYWA",
     "PIECZYWO",
     "NABIAL",
-    "ALHOHOL",
+    "ALKOHOL",
     "WEDLINY",
     "MAKARONY",
     "NAPOJE",
     "MIESO",
     "RYBY"
+};
+
+const std::vector<std::vector<int>> products_price = {
+    {3, 6, 5, 15, 20},
+    {3, 2, 8, 6},
+    {5, 1, 4},
+    {4, 12, 3, 8, 5, 4},
+    {5, 30, 40, 90},
+    {15, 25, 12, 10, 18},
+    {6, 6, 6},
+    {2, 7, 6, 5},
+    {24, 26, 45, 19},
+    {70, 45, 35}
 };
 
 const std::vector<std::vector<std::string>> products = {
@@ -136,3 +132,15 @@ const std::vector<std::vector<std::string>> products = {
     {"Piers z Kurczaka", "Schab", "Wolowina", "Mielone"},
     { "Losos", "Dorsz", "Pstrag"}
 };
+
+
+inline int wyswietl_cene_produktu(const char * produkt) {
+    for(int i=0;i < products.size(); i++) {
+        for(int j=0; j < products[i].size(); j++) {
+            if( strcmp(products[i][j].c_str(), produkt) == 0) {
+                return products_price[i][j];
+            }
+        }
+    }
+    return 0;
+}

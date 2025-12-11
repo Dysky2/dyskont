@@ -58,7 +58,7 @@ int main(int argc, char * argv[]) {
     komunikat << "Klient wchodzi do sklepu" << "\n";
     
     // ILES CZASU JEST W SKLEPIE 
-    sleep(randomTime(10));
+    sleep(randomTime(12));
     // ten sleep powinien byc git po jakby wstrzymuje ten proces na iles
     
     // generateProducts();
