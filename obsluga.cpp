@@ -17,8 +17,9 @@ int main(int argc, char * argv[]) {
             break;
         }
 
-        sleep(5);
         if(obsluga.powod == 1) {
+            // Czas az obsluga podejdzie do kasy
+            sleep(5);
             if(obsluga.wiek_klienta >= 18) {
                 obsluga.pelnoletni = 0;
                 komunikat << "Klient jest pelnoletni, moze kupic alkohol, przy kasie: " << obsluga.kasa_id << "\n";
@@ -26,7 +27,13 @@ int main(int argc, char * argv[]) {
                 obsluga.pelnoletni = -1;
                 komunikat << "Klient nie jest pelnoletni, alkohol zostanie odlozony, przy kasie: " << obsluga.kasa_id  << "\n";
             }
+        } else if(obsluga.powod == 2) {
+            // Czas az obsługa poprawi kase
+            sleep(7);
+            komunikat << "Waga przy kasie " << obsluga.kasa_id << " zostala naprawiona\n";
         }
+
+
         obsluga.mtype = obsluga.kasa_id;
         msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0);
     }

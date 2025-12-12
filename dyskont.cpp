@@ -14,7 +14,7 @@ int main() {
     komunikat << "Pid dyskontu: " << getpid() << "\n";
 
     const double simulation_speed = 1.0;
-    const int simulation_time = 120;
+    const int simulation_time = 20;
     const int startowa_ilosc_kas = 3;
     int ilosc_otwratych_kas = 0;
 

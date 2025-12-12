@@ -45,7 +45,7 @@ int main(int argc, char * argv[]) {
         paragon << "\n";
         paragon << ".==================================." << "\n";
         paragon << "|             Dyskont              |" << "\n";
-        paragon << "|        ul. Jana Wojtasa 93       |" << "\n";
+        paragon << "|         ul. Warszawska 93        |" << "\n";
         paragon << "|          32-000 Kraków           |" << "\n";
         paragon << "|----------------------------------|" << "\n";
         paragon << "|    Paragon fiskalny nr:  " << left << setw(8) << randomTime(10000) << "|\n";

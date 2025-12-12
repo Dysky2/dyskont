@@ -48,7 +48,7 @@ int main(int argc, char * argv[]) {
         paragon << "\n";
         paragon << ".==================================." << "\n";
         paragon << "|             Dyskont              |" << "\n";
-        paragon << "|        ul. Jana Wojtasa 93       |" << "\n";
+        paragon << "|         ul. Warszawska 93        |" << "\n";
         paragon << "|          32-000 Kraków           |" << "\n";
         paragon << "|----------------------------------|" << "\n";
         paragon << "|    Paragon fiskalny nr:  " << left << setw(8) << randomTime(10000) << "|\n";
@@ -60,6 +60,21 @@ int main(int argc, char * argv[]) {
 
         int aktualna_pozycja = 0, suma = 0;
         for(int i=0;i < klient.ilosc_produktow;i++) {
+
+            // 2% szans ze kasa sie 
+            if(randomTimeWithRange(1, 100) > 90) {
+                komunikat << "Waga towaru sie nie zgadza, prosze poczekac na obsluge \n";
+                Obsluga obsluga = {1, 2, getpid()};
+
+                checkError( 
+                    msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0),
+                    "Blad wyslania komuniaktu to obslugi o sprawdzenie pelnoletnosci przez kase"
+                );
+
+                msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
+            }
+
+
             char * produkt = klient.lista_produktow + aktualna_pozycja;
             if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
                     
