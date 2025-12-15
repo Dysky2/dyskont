@@ -13,11 +13,36 @@
 #include <sstream>
 #include <cstring>
 #include <iomanip>
+#include <limits.h>
 
 #define MAX_DATA_SIZE 200
 
+#define ILOSC_KOLJEJEK 3
+#define MAX_DLUGOSC_KOLEJEK 100
+#define ILOSC_KAS 8
+
+#define CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA 10
+#define CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA 15
+
 const double simulation_speed = 1.0;
 const int simulation_time = 10;
+
+struct kasy {
+    int pid_kasy[8];
+    int status[8]; // 0 -> kasa zamknieta 1 -> kasa otwarta 2-> kasa zajeta
+    int kolejka_pid[ILOSC_KOLJEJEK][MAX_DLUGOSC_KOLEJEK];
+    int dlugosc_kolejki[ILOSC_KOLJEJEK];
+
+    float sredni_czas_obslugi[3]; // 0 czas kasy samooblugowe, 1 -> czas kasy stacjonranerej_1, 2 -> czas kasy stacjonranerej_2
+};
+
+struct Obsluga {
+    long int mtype;
+    int powod; // 1 -> Sprawdzenie wieku, 2 -> popsuta kasa
+    int kasa_id;
+    int wiek_klienta;
+    int pelnoletni; // -1 -> osobo niepelnetnia 0 -> pelnoletni
+};
 
 inline int checkError(int result, const char * msg) {
     if (result == -1) {
@@ -55,7 +80,7 @@ struct AtomicLogger {
 #define komunikat AtomicLogger()
 
 struct Klient {
-    long mtype;
+    long int mtype;
     int klient_id;
     int nrKasy;
     int wiek;
@@ -63,19 +88,6 @@ struct Klient {
     char lista_produktow[MAX_DATA_SIZE];
 };
 
-struct kasy {
-    int pid_kasy[8];
-    int status[8];
-    int liczba_ludzi[3];
-};
-
-struct Obsluga {
-    long int mtype;
-    int powod; // 1 -> Sprawdzenie wieku, 2 -> popsuta kasa
-    int kasa_id;
-    int wiek_klienta;
-    int pelnoletni; // -1 -> osobo niepelnetnia 0 -> pelnoletni
-};
 
 union semun {
     int val;
@@ -84,14 +96,113 @@ union semun {
     struct seminfo *__buf;
 };
 
-inline void zmien_wartosc_kolejki(int semid, kasy * lista_kas, int nrKolejki, int operacja) {
-    struct sembuf OperacjaP = {0, -1, SEM_UNDO};
-    checkError( semop(semid, &OperacjaP, 1), "Blad obnizenia semafora" );
+class Kolejka {
+private: 
+    kasy * lista_kas;
 
-    lista_kas->liczba_ludzi[nrKolejki] += operacja;
+public:
+    Kolejka(kasy * lista_kas) {
+        this->lista_kas = lista_kas;
+    }
 
-    struct sembuf OperacjaV = {0, 1, SEM_UNDO};
-    checkError( semop(semid, &OperacjaV, 1), "Blad podniesienia semafora" );
+    void dodaj_do_kolejki(int pid_klienta, int nr_kolejki) {
+        int index = lista_kas->dlugosc_kolejki[nr_kolejki];
+        if(index < 0 || index >= 100) {
+            return;
+        }
+        lista_kas->kolejka_pid[nr_kolejki][index] = pid_klienta;
+        lista_kas->dlugosc_kolejki[nr_kolejki]++;
+    }
+
+    void usun_z_kolejki(int pid_klienta, int nr_kolejki) {
+        if(nr_kolejki < 0 || nr_kolejki >= 3) {
+            perror("blad usuniecia kolejki");
+            return;
+        }
+        int ilosc_osob_w_kolejce = lista_kas->dlugosc_kolejki[nr_kolejki];
+        if(ilosc_osob_w_kolejce > 0) {
+            int index_klienta = -1;
+            for(int i=0; i< ilosc_osob_w_kolejce; i++) {
+                if(pid_klienta == lista_kas->kolejka_pid[nr_kolejki][i]) {
+                    index_klienta = i;
+                    break;
+                }
+            }
+            if(index_klienta != -1) {
+                for(int j = index_klienta; j < ilosc_osob_w_kolejce - 1; j++ ) {
+                    lista_kas->kolejka_pid[nr_kolejki][j] = lista_kas->kolejka_pid[nr_kolejki][j + 1];
+                }
+                lista_kas->kolejka_pid[nr_kolejki][ilosc_osob_w_kolejce - 1] = 0;
+                lista_kas->dlugosc_kolejki[nr_kolejki]--;
+            }
+        }
+    }
+
+    int czy_jestem_pierwszy(int pid_klienta, int nr_kolejki) {
+        if(pid_klienta == lista_kas->kolejka_pid[nr_kolejki][0]) {
+            return 1;
+        }
+        return 0;
+    }
+
+    // szuka w podanym numerze kolejki swojego id i zwraca pozycje na której się znajduje
+    int znajdz_moja_pozycje_w_kolejce(int pid_klienta, int nr_kolejki) {
+        int pozycja = -1;
+        for(int i=0;i < lista_kas->dlugosc_kolejki[nr_kolejki]; i++) {
+            if(pid_klienta == lista_kas->kolejka_pid[nr_kolejki][i]) {
+                pozycja = i;
+                break;
+            }
+        }
+        return pozycja;
+    }
+
+    int czy_oplaca_sie_zmienic_kolejke(int pid_klienta, int aktualny_nr_kolejki) {
+
+        int pozycja = znajdz_moja_pozycje_w_kolejce(pid_klienta, aktualny_nr_kolejki);
+        if(pozycja == -1) return -1;
+
+        float najkrotszy_czas = pozycja * lista_kas->sredni_czas_obslugi[aktualny_nr_kolejki];
+
+        float czas_kolejki_do_ktorej_chce_przejsc = -1;
+        int najepszy_wybor = -1;
+
+        if(aktualny_nr_kolejki == 0) {
+            for(int i=6 ; i < 8; i++) {
+
+                int nr_koleki = i == 6 ? 1 : 2;
+
+                czas_kolejki_do_ktorej_chce_przejsc = lista_kas->sredni_czas_obslugi[nr_koleki] * lista_kas->dlugosc_kolejki[nr_koleki];
+
+                if(lista_kas->status[i] == 1 && (czas_kolejki_do_ktorej_chce_przejsc + 10 < najkrotszy_czas)) {
+                    najkrotszy_czas = czas_kolejki_do_ktorej_chce_przejsc;
+                    najepszy_wybor = nr_koleki;
+                }
+            }
+
+        } 
+        else if(aktualny_nr_kolejki == 1) {
+            czas_kolejki_do_ktorej_chce_przejsc = lista_kas->sredni_czas_obslugi[2] * lista_kas->dlugosc_kolejki[2];
+
+            if(lista_kas->status[7] == 1 && (czas_kolejki_do_ktorej_chce_przejsc + 10 < najkrotszy_czas) ) {
+                najkrotszy_czas = czas_kolejki_do_ktorej_chce_przejsc;
+                najepszy_wybor = 2;
+            }
+        }
+        return najepszy_wybor;
+    }
+};
+
+
+int findInexOfPid(int pid, kasy * lista) {
+    int res = -1;
+
+    for(int i = 0; i < 8; i++) {
+        if( lista->pid_kasy[i] == pid ) {
+            res = i;
+        }
+    }
+    return res;
 }
 
 const std::string kategorieProduktow[10] = {

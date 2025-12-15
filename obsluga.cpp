@@ -5,7 +5,7 @@
 using namespace std;
 
 int main(int argc, char * argv[]) {
-    komunikat << "Witam tutaj obłsuga " << "\n";
+    komunikat << "[OBSLUGA] " << "Witam " << "\n";
 
     int msqid_kolejka_obsluga = atoi(argv[1]);
 
@@ -19,18 +19,18 @@ int main(int argc, char * argv[]) {
 
         if(obsluga.powod == 1) {
             // Czas az obsluga podejdzie do kasy
-            sleep(5);
+            sleep(2);
             if(obsluga.wiek_klienta >= 18) {
                 obsluga.pelnoletni = 0;
-                komunikat << "Klient jest pelnoletni, moze kupic alkohol, przy kasie: " << obsluga.kasa_id << "\n";
+                komunikat << "[OBSLUGA] " << "Klient jest pelnoletni, moze kupic alkohol, przy kasie: " << obsluga.kasa_id << "\n";
             } else {
                 obsluga.pelnoletni = -1;
-                komunikat << "Klient nie jest pelnoletni, alkohol zostanie odlozony, przy kasie: " << obsluga.kasa_id  << "\n";
+                komunikat << "[OBSLUGA] " << "Klient nie jest pelnoletni, alkohol zostanie odlozony, przy kasie: " << obsluga.kasa_id  << "\n";
             }
         } else if(obsluga.powod == 2) {
             // Czas az obsługa poprawi kase
-            sleep(7);
-            komunikat << "Waga przy kasie " << obsluga.kasa_id << " zostala naprawiona\n";
+            sleep(2);
+            komunikat << "[OBSLUGA] " << "Waga przy kasie " << obsluga.kasa_id << " zostala naprawiona\n";
         }
 
 
@@ -38,6 +38,6 @@ int main(int argc, char * argv[]) {
         msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0);
     }
 
-    komunikat << "Koniec obsługi " << "\n";
+    komunikat << "[OBSLUGA] " << "Koncze prace " << "\n";
     exit(0);
 }

@@ -4,9 +4,21 @@
 
 using namespace std;
 
+volatile sig_atomic_t czy_kasa_otwarta = 1; 
+
+void zamknij_kase(int sigint) {
+    czy_kasa_otwarta = 0;
+}
+
+void zacznij_prace(int sigint) { }
+
 int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
-    komunikat << "Tutaj kasa witam" << "\n";
+
+    signal(SIGCONT, zacznij_prace);
+    signal(SIGTERM, zamknij_kase);
+
+    komunikat << "[KASA-" << getpid() << "]" << " Witam zapraszamy" << "\n";
 
     int semid_klienci = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
@@ -27,17 +39,21 @@ int main(int argc, char * argv[]) {
     komunikat << bufor.str();
     bufor.clear();
 
-    while(1) {
+    while(czy_kasa_otwarta) {
+        if(lista_kas->status[findInexOfPid(getpid(), lista_kas)] == 0) {
+            pause();
+            continue;
+        }
         Klient klient;
-        checkError( msgrcv(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long int), 1, 0), "Blad odebrania wiadomosci" );
+        memset(&klient, 0, sizeof(Klient)); 
+        checkError( msgrcv(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR), "Blad odebrania wiadomosci" );
         
         if (klient.ilosc_produktow == -1 || klient.klient_id == getpid()) {
             break;
         }
 
-        sleep(randomTime(12));
-
-        komunikat << "ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
+        komunikat << "[KASA-" << getpid() << "-" <<klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
+        sleep(randomTime(8));
         
         stringstream paragon;
         time_t t = time(0);
@@ -62,8 +78,8 @@ int main(int argc, char * argv[]) {
         for(int i=0;i < klient.ilosc_produktow;i++) {
 
             // 2% szans ze kasa sie 
-            if(randomTimeWithRange(1, 100) > 90) {
-                komunikat << "Waga towaru sie nie zgadza, prosze poczekac na obsluge \n";
+            if(randomTimeWithRange(1, 100) > 98) {
+                komunikat << "[KASA-" << getpid() << "]" << " Waga towaru sie nie zgadza, prosze poczekac na obsluge \n";
                 Obsluga obsluga = {1, 2, getpid()};
 
                 checkError( 
@@ -141,23 +157,12 @@ int main(int argc, char * argv[]) {
 
         komunikat << paragon.str() << "\n";
 
-        if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
-            komunikat << "KASA probuje odjac z kolejki gdzie jest 0" << "\n" << "\n"; 
-        } else {
-            zmien_wartosc_kolejki(semid_kolejki, lista_kas, klient.nrKasy , -1);
-        }
-
         if(kill(klient.klient_id, 0) == 0) {
             klient.mtype = klient.klient_id;
-            msgsnd(msqid_kolejka_samo, &klient, sizeof(klient) - sizeof(long int), 0);
+            msgsnd(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 0);
         }
-
-        komunikat << "Ilosc ludzi w kolejce OD KASY " << lista_kas->liczba_ludzi[0] << "\n";
-        komunikat << "Ilosc ludzi w kolejce OD KASY " << lista_kas->liczba_ludzi[1] << "\n";
-        komunikat << "Ilosc ludzi w kolejce OD KASY " << lista_kas->liczba_ludzi[2] << "\n";
-  
     }
 
-    komunikat << "Koniec kasy " << "\n";
+    komunikat << "[KASA-" << getpid() << "]" << " Koniec" << "\n";
     exit(0);
 }

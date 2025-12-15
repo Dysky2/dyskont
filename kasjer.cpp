@@ -4,12 +4,27 @@
 
 using namespace std;
 
-void sigalrm_handler(int sig) { }
+volatile sig_atomic_t czy_kasa_otwarta = 1; 
+
+void zacznij_prace(int sigint) { }
+
+void wstrzymaj_kase(int sigint) { }
+
+void zamknij_kase(int sigint) {
+    czy_kasa_otwarta = 0;
+}
+
+void otworz_kase_stac2(int sig) {
+    komunikat << "Otwieram kase stacjonarna 2\n";
+}
 
 int main(int argc, char * argv[]) {
     komunikat << "Otwieram kase stacjonarna " << getpid() << "\n";
 
-    signal(SIGALRM, sigalrm_handler);
+    signal(SIGALRM, wstrzymaj_kase);
+    signal(SIGUSR2, otworz_kase_stac2);
+    signal(SIGCONT, zacznij_prace);
+    signal(SIGTERM, zamknij_kase);
 
     int semid_klienci = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
@@ -19,22 +34,41 @@ int main(int argc, char * argv[]) {
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
 
-    while(1) {
-        Klient klient;
+    int nr_kasy = checkError(findInexOfPid(getpid(), lista_kas), "Blad: nie znaleziono pidu kasy\n");
+
+    while(czy_kasa_otwarta) {
+        if(lista_kas->status[nr_kasy] == 0) {
+            pause();
+            continue;
+        } 
 
         alarm(30);  
+        Klient klient;
+        memset(&klient, 0, sizeof(Klient)); 
+        int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
+        int status = msgrcv(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR);
 
-        msgrcv(msqid_kolejka_stac1, &klient, sizeof(klient) - sizeof(long), 1, 0);
-
-        if(klient.ilosc_produktow == -1 || klient.klient_id==getpid() || errno == EINTR) {
+        if(klient.ilosc_produktow == -1 || klient.klient_id==getpid()) {
             break;
+        }
+
+        komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
+        if(status == -1) {
+            if(errno = EINTR && (lista_kas->dlugosc_kolejki[1] > 0 || lista_kas->dlugosc_kolejki[2] > 0)) {
+                continue;
+            }
+
+            if(errno == EINTR) {
+                struct sembuf operacjaP = {0, -1, SEM_UNDO};
+                semop(semid_kolejki, &operacjaP, 1);
+                lista_kas->status[findInexOfPid(getpid(), lista_kas)] = 0;
+                continue;
+            }
         }
 
         alarm(0);
 
-        sleep(randomTime(10));
-        
-        komunikat << "ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
+        sleep(randomTime(5));
         
         stringstream paragon;
         time_t t = time(0);
@@ -111,25 +145,18 @@ int main(int argc, char * argv[]) {
         paragon << "|                                  |\n";
         paragon << "| DZIEKUJEMY I ZAPRASZAMY PONOWNIE |\n";
         paragon << "'=================================='" << "\n"; 
-
         komunikat << paragon.str() << "\n";
-
-        if(lista_kas->liczba_ludzi[klient.nrKasy] <= 0) {
-            komunikat << "KASJER probuje odjac z kolejki gdzie jest 0" << "\n" << "\n";
-        } else {
-            zmien_wartosc_kolejki(semid_kolejki, lista_kas, klient.nrKasy , -1);
-        }
 
         if(kill(klient.klient_id, 0) == 0) {
             klient.mtype = klient.klient_id;
-            msgsnd(msqid_kolejka_stac1, &klient, sizeof(klient) - sizeof(long int), 0);
+            msgsnd(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 0);
         }
 
-        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[0] << "\n";
-        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[1] << "\n";
-        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->liczba_ludzi[2] << "\n";
+        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->dlugosc_kolejki[0] << "\n";
+        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->dlugosc_kolejki[1] << "\n";
+        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << lista_kas->dlugosc_kolejki[2] << "\n";
     }
 
-    komunikat << "Zamykam kase stacjonarna: " << getpid() << "\n" << "\n";
+    komunikat  << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n" << "\n";
     exit(0);
 }

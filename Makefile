@@ -1,4 +1,4 @@
-all: dyskont klient kasa kasjer obsluga
+all: dyskont klient kasa kasjer obsluga kierownik
 
 dyskont: dyskont.cpp utils.h
 	g++ dyskont.cpp -o dyskont
@@ -14,6 +14,9 @@ kasjer: kasjer.cpp utils.h
 
 obsluga: obsluga.cpp utils.h
 	g++ obsluga.cpp -o obsluga
+
+kierownik: kierownik.cpp utils.h
+	g++ kierownik.cpp -o kierownik
 
 clean:
 	rm -f dyskont klient kasa kasjer obsluga *.o
