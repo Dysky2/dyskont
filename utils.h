@@ -31,7 +31,7 @@
 #define SEMAFOR_ILOSC_KAS 4
 
 const double simulation_speed = 1.0;
-const int simulation_time = 20;
+const int simulation_time = 100;
 const int startowa_ilosc_kas = 3;
 
 

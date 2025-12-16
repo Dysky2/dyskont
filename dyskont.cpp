@@ -74,18 +74,32 @@ int main() {
     int msqid_kolejka_obsluga = checkError( msgget(key_kolejka_obsluga, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
     int kierownik_pid = checkError(fork(), "Blad utowrzenia forka");
+
     if (kierownik_pid == 0) {
-        checkError(
-                execlp("tmux", 
-                        "tmux", 
-                        "split-window",
-                        "-v",
-                        "./kierownik",  
-                        to_string(shmId_kasy).c_str(),
-                        NULL
-                ),
-                "Blad wywolania execa"
-            );
+        char cwd[PATH_MAX];
+        if (getcwd(cwd, sizeof(cwd)) == NULL) {
+            perror("Blad getcwd");
+            exit(1);
+        }
+    
+        string komenda_bash = "cd " + string(cwd) + "; ./kierownik " + to_string(shmId_kasy) + "; exec bash";
+        
+        execlp("cmd.exe", 
+            "cmd.exe",
+            "/c",
+            "start", 
+            "Okienko Kierownika",
+            "wsl.exe",  
+            "-d", "Ubuntu-22.04",
+            "--",
+            "bash", 
+            "-c", 
+            komenda_bash.c_str(),
+            NULL
+        );
+
+        perror("Blad uruchomienia nowego okna");
+        exit(1);
     }
 
     komunikat << "[DYSKONT]" << "Obsluga wchodzi do sklepu" << "\n";

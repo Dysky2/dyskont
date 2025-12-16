@@ -6,6 +6,8 @@ using namespace std;
 
 volatile sig_atomic_t czy_kasa_otwarta = 1; 
 
+int shmid_kasy = 0;
+
 void zacznij_prace(int sigint) { }
 
 void wstrzymaj_kase(int sigint) { }
@@ -16,18 +18,25 @@ void zamknij_kase(int sigint) {
 
 void otworz_kase_stac2(int sig) {
     komunikat << "Otwieram kase stacjonarna 2\n";
+
+    kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
+    if(lista_kas->status[7] == 1) {
+        komunikat << "Ta kasa jest juz otarta";
+    } else {
+        lista_kas->status[7] = 1;
+    }
 }
 
 int main(int argc, char * argv[]) {
     komunikat << "Otwieram kase stacjonarna " << getpid() << "\n";
 
     signal(SIGALRM, wstrzymaj_kase);
-    signal(SIGUSR2, otworz_kase_stac2);
+    signal(SIGUSR1, otworz_kase_stac2);
     signal(SIGCONT, zacznij_prace);
     signal(SIGTERM, zamknij_kase);
 
     int sem_id = atoi(argv[1]);
-    int shmid_kasy = atoi(argv[2]);
+    shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_stac1 = atoi(argv[3]);
     int msqid_kolejka_stac2 = atoi(argv[4]);
 
@@ -41,7 +50,7 @@ int main(int argc, char * argv[]) {
             continue;
         } 
 
-        alarm(30);  
+        alarm(10);  
         Klient klient;
         memset(&klient, 0, sizeof(Klient)); 
         int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
@@ -51,20 +60,21 @@ int main(int argc, char * argv[]) {
             break;
         }
 
-        komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
         if(status == -1) {
-            if(errno = EINTR && (lista_kas->dlugosc_kolejki[1] > 0 || lista_kas->dlugosc_kolejki[2] > 0)) {
+            if(errno == EINTR && (lista_kas->dlugosc_kolejki[1] > 0 || lista_kas->dlugosc_kolejki[2] > 0)) {
                 continue;
             }
 
             if(errno == EINTR) {
+                komunikat << "Zamykam kase o pidzie: " << getpid() << "\n";
                 struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
                 semop(sem_id, &operacjaP, 1);
-                lista_kas->status[findInexOfPid(getpid(), lista_kas)] = 0;
+                lista_kas->status[nr_kasy] = 0;
                 continue;
             }
         }
 
+        komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
         alarm(0);
 
         sleep(randomTime(10));
