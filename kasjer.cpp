@@ -17,7 +17,6 @@ void zamknij_kase(int sigint) {
 }
 
 void otworz_kase_stac2(int sig) {
-    
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
     if(lista_kas->status[7] == 1) {
     } else {
@@ -44,15 +43,33 @@ int main(int argc, char * argv[]) {
     int nr_kasy = checkError(findInexOfPid(getpid(), lista_kas), "Blad: nie znaleziono pidu kasy\n");
 
     while(czy_kasa_otwarta) {
+        int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
+
         if(lista_kas->status[nr_kasy] == 0) {
+            struct msqid_ds buf;
+            while (pobierz_ilosc_wiadomosci(id_kasy) > 0) {
+                komunikat << "POSIADAM komunikaty u siebie\n";
+
+                Klient klient_do_zwrotu;
+                memset(&klient_do_zwrotu, 0, sizeof(Klient)); 
+                checkError(msgrcv(id_kasy, &klient_do_zwrotu, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR), "Bledne odebranie wiadomosci kiedy kasa jest zamknieta");
+
+                if(kill(klient_do_zwrotu.klient_id, 0) == 0) {
+                    klient_do_zwrotu.mtype = klient_do_zwrotu.klient_id;
+                    klient_do_zwrotu.klient_id = -1;
+                    msgsnd(id_kasy, &klient_do_zwrotu, sizeof(Klient) - sizeof(long int), 0);
+                }
+
+            }
+            alarm(2);
             pause();
             continue;
         } 
 
+        komunikat << "KASJER NORMALNIE SMIGA " << nr_kasy << "\n\n\n";
         alarm(10);  
         Klient klient;
         memset(&klient, 0, sizeof(Klient)); 
-        int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
         int status = msgrcv(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR);
 
         if(klient.ilosc_produktow == -1 || klient.klient_id==getpid()) {
@@ -76,7 +93,7 @@ int main(int argc, char * argv[]) {
         komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
         alarm(0);
 
-        sleep(randomTime(10));
+        sleep(randomTime(15));
         
         stringstream paragon;
         time_t t = time(0);

@@ -31,7 +31,7 @@
 #define SEMAFOR_ILOSC_KAS 4
 
 const double simulation_speed = 1.0;
-const int simulation_time = 6;
+const int simulation_time = 30;
 const int startowa_ilosc_kas = 3;
 
 
@@ -86,6 +86,17 @@ inline int randomTime(int time) {
 inline int randomTimeWithRange(int min, int max) {
     return rand() % (max - min + 1) + min; 
 };
+
+inline int pobierz_ilosc_wiadomosci(int msqid) {
+    struct msqid_ds buf;
+
+    if (msgctl(msqid, IPC_STAT, &buf) == -1) {
+        perror("Blad msgctl z odbiorem danych");
+        return -1; 
+    }
+
+    return buf.msg_qnum;
+}
 
 struct AtomicLogger {
     std::stringstream bufor;
@@ -152,7 +163,7 @@ public:
         for(int i=0; i < lista_kas->dlugosc_kolejki[nr_kolejki]; i++) {
             bufor << lista_kas->kolejka_pid[nr_kolejki][i] << " ";
         }
-        komunikat << bufor.str() << "\n\n";
+        komunikat << nr_kolejki << ": " << bufor.str() << "\n\n";
         bufor.clear();
     }
 
@@ -205,6 +216,20 @@ public:
             if(lista_kas->status[7] == 1 && (czas_kolejki_do_ktorej_chce_przejsc + 10 < najkrotszy_czas) ) {
                 najkrotszy_czas = czas_kolejki_do_ktorej_chce_przejsc;
                 najepszy_wybor = 2;
+            }
+
+            int jest_samooboslugowa = 0;
+            for(int i=0;i<6;i++) {
+                if(lista_kas->status[i] == 1) {
+                    jest_samooboslugowa = 1;
+                    break;
+                }
+            }
+
+            czas_kolejki_do_ktorej_chce_przejsc = lista_kas->sredni_czas_obslugi[0] * lista_kas->dlugosc_kolejki[0];
+            if(jest_samooboslugowa && (czas_kolejki_do_ktorej_chce_przejsc + 10 < najkrotszy_czas)) {
+                najkrotszy_czas = czas_kolejki_do_ktorej_chce_przejsc;
+                najepszy_wybor = 0;
             }
         }
         return najepszy_wybor;

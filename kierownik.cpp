@@ -29,6 +29,7 @@ int main(int argc, char * argv[]) {
     sigaction(SIGALRM, &sa_alarm, NULL);
 
     int shmid_kasy = atoi(argv[1]);
+    int sem_id = atoi(argv[2]);
     
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
     lista_kas->pid_kierownika = getpid();
@@ -57,27 +58,44 @@ int main(int argc, char * argv[]) {
             continue;
         }
 
+        int kasa = 0;
         switch (option) {
-        case 1:
-            if(lista_kas->status[7] == 0) {
-                kill(lista_kas->pid_kasy[7], SIGUSR1);
-            } else {
-                komunikat << "Ta kasa jest juz otwarta\n";
-            }
-            break;
-        case 2:
-            
-            break;
+            case 1:
+                if(lista_kas->status[7] == 0) {
+                    // TODO podniesie semafora z liczba_kas
+                    kill(lista_kas->pid_kasy[7], SIGUSR1);
+                } else {
+                    komunikat << "Ta kasa jest juz otwarta\n";
+                }
+                break;
+            case 2:
+                komunikat << "Wybierz kase 1 lub 2: ";
+                cin >> kasa;
+                if(kasa == 1) {
+                    if(lista_kas->status[6] == 1) {
+                        // TODO opusczenie semafora LICZA_KAS
+                        struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
+                        semop(sem_id, &operacjaP, 1);
+                        lista_kas->status[6] = 0;
+                    }
+                } else if(kasa == 2) {
+                    if(lista_kas->status[7] == 1) {
+                        lista_kas->status[7] = 0;
+                    }
+                } else {
+                    komunikat << "Podano zla kase\n";
+                }
 
-        case 3:
+                break;
+            case 3:
 
-            break;
-        case 4:
-            exit(0);
-            break;
-        default:
-            komunikat << "Wywolano zla opcje\n";
-            break;
+                break;
+            case 4:
+                exit(0);
+                break;
+            default:
+                komunikat << "Wywolano zla opcje\n";
+                break;
         }
     }
 

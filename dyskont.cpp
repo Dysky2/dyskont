@@ -82,7 +82,7 @@ int main() {
             exit(1);
         }
     
-        string komenda_bash = "cd " + string(cwd) + "; ./kierownik " + to_string(shmId_kasy) + "; exec bash";
+        string komenda_bash = "cd " + string(cwd) + "; ./kierownik " + to_string(shmId_kasy) + " " + to_string(sem_id) + "; exec bash";
         
         execlp("cmd.exe", 
             "cmd.exe",
@@ -151,7 +151,7 @@ int main() {
                         to_string(sem_id).c_str(), 
                         to_string(shmId_kasy).c_str(), 
                         to_string(msqid_kolejka_stac1).c_str(), 
-                        to_string(msqid_kolejka_stac2).c_str(), 
+                        to_string(msqid_kolejka_stac2).c_str(),
                         NULL
                     ),
                     "Blad wywolania execa"
