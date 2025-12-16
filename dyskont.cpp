@@ -272,6 +272,8 @@ int main() {
         }
     }
 
+    kill(lista_kas->pid_kierownika, SIGTERM);
+
     // Czekam az wszyscy klienci zakoncza zakupy
     while (wait(NULL) > 0) {}
 

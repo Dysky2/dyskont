@@ -17,12 +17,11 @@ void zamknij_kase(int sigint) {
 }
 
 void otworz_kase_stac2(int sig) {
-    komunikat << "Otwieram kase stacjonarna 2\n";
-
+    
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
     if(lista_kas->status[7] == 1) {
-        komunikat << "Ta kasa jest juz otarta";
     } else {
+        komunikat << "Otwieram kase stacjonarna 2\n";
         lista_kas->status[7] = 1;
     }
 }

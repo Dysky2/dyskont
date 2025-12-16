@@ -31,7 +31,7 @@
 #define SEMAFOR_ILOSC_KAS 4
 
 const double simulation_speed = 1.0;
-const int simulation_time = 100;
+const int simulation_time = 6;
 const int startowa_ilosc_kas = 3;
 
 
@@ -43,6 +43,8 @@ struct kasy {
     int dlugosc_kolejki[ILOSC_KOLJEJEK];
 
     float sredni_czas_obslugi[3]; // 0 czas kasy samooblugowe, 1 -> czas kasy stacjonranerej_1, 2 -> czas kasy stacjonranerej_2
+
+    pid_t pid_kierownika;
 };
 
 struct Obsluga {
