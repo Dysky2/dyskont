@@ -41,20 +41,22 @@ int main(int argc, char * argv[]) {
 
     signal(SIGALRM, sigalrm_handler);
 
-    int semid_klienci = atoi(argv[1]);
+    int sem_id = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_samo = atoi(argv[3]);
     int msqid_kolejka_stac1 = atoi(argv[4]);
     int msqid_kolejka_stac2 = atoi(argv[5]);
-    int semid_kolejki = atoi(argv[6]);
-    int semid_kolejek = atoi(argv[7]);
     
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
 
-    struct sembuf operacjaV = {0, 1, SEM_UNDO};
-    struct sembuf operacjaP = {0, -1, SEM_UNDO};
+    struct sembuf operacjaV_ilosc_klientow = {SEMAFOR_ILOSC_KLIENTOW, 1, SEM_UNDO};
+    struct sembuf operacjaP_ilosc_klientow = {SEMAFOR_ILOSC_KLIENTOW, -1, SEM_UNDO};
+    struct sembuf operacjaV_nr_kasy = {0, 1, SEM_UNDO};
+    struct sembuf operacjaP_nr_kasy = {0, -1, SEM_UNDO};
+    struct sembuf operacjaV_ilosc_kas = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
+    struct sembuf operacjaP_ilosc_kas = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
 
-    checkError( semop(semid_klienci, &operacjaV, 1), "Blad podniesienia semafora" );
+    checkError( semop(sem_id, &operacjaV_ilosc_klientow, 1), "Blad podniesienia semafora" );
 
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "Wchodzi do sklepu" << "\n";
     
@@ -92,41 +94,64 @@ int main(int argc, char * argv[]) {
 
     Kolejka * kolejka = new Kolejka(lista_kas);
 
-    operacjaP.sem_num = aktualnyNr;
-    operacjaV.sem_num = aktualnyNr;
+    operacjaP_nr_kasy.sem_num = aktualnyNr;
+    operacjaV_nr_kasy.sem_num = aktualnyNr;
 
-    checkError( semop(semid_kolejek, &operacjaP, 1), "Blad obnizenia semafora-1" );
+    checkError( semop(sem_id, &operacjaP_nr_kasy, 1), "Blad obnizenia semafora-1" );
     kolejka->dodaj_do_kolejki(getpid(), aktualnyNr);
-    checkError( semop(semid_kolejek, &operacjaV, 1), "Blad podniesienia semafora-1" );
+    checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-1" );
     komunikat << "[" << "Klient-" << getpid() << "] " << "Staje do kasy " << aktualnyNr << "\n";
 
     time_t czas_startu = time(NULL);
     while(1) {
-        operacjaP.sem_num = aktualnyNr;
-        operacjaV.sem_num = aktualnyNr;
-        checkError( semop(semid_kolejek, &operacjaP, 1), "Blad obnizenia semafora-2" );
+        operacjaP_nr_kasy.sem_num = aktualnyNr;
+        operacjaV_nr_kasy.sem_num = aktualnyNr;
+        checkError( semop(sem_id, &operacjaP_nr_kasy, 1), "Blad obnizenia semafora-2" );
         int czy_jestem_pierwszy = kolejka->czy_jestem_pierwszy(getpid(), aktualnyNr);
-        checkError( semop(semid_kolejek, &operacjaV, 1), "Blad podniesienia semafora-2" );
+        checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-2" );
 
         if(czy_jestem_pierwszy) {
             komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << lista_kas->dlugosc_kolejki[0] << "\n";
             komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << lista_kas->dlugosc_kolejki[1] << "\n";
             komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << lista_kas->dlugosc_kolejki[2] << "\n";
-            // checkError( semop(semid_kolejki, &operacjaP, 1), "Blad obnizenia semafora-3" );
-            // checkError( semop(semid_kolejki, &operacjaV, 1), "Blad podniesienia semafora-3" );
+
+            checkError( semop(sem_id, &operacjaP_ilosc_kas, 1), "Blad obnizenia semafora-3" );
+
+            Klient klient = {1 , getpid(), aktualnyNr};
+            klient.wiek = randomTimeWithRange(8, 50);
+            int dlugosc_tekstu = generateProducts(&klient);
+
+            int status = msgsnd(aktualneId, &klient, sizeof(int) * 4 + dlugosc_tekstu, 0);
+            if(status != -1) {
+                checkError( semop(sem_id, &operacjaP_nr_kasy, 1), "Blad obnizenia semafora-2" );
+                kolejka->usun_z_kolejki(getpid(), aktualnyNr);
+                checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-2" );
+
+                komunikat << "[" << "KLIENT-" << getpid() << "] " << "Ide do kasy nr: " << aktualnyNr << "\n";
+            }
+
+            Klient odebrany;
+            memset(&klient, 0, sizeof(Klient)); 
+            int rcvStatus = msgrcv(aktualneId, &odebrany, sizeof(Klient) - sizeof(long int), getpid(), 0);
+
+            if(rcvStatus != -1) {
+                komunikat << "[" << "KLIENT-" << getpid() << "] " << "ZAKUPY DOKONANE ILOSC PRODUKTÓW " << odebrany.ilosc_produktow << "\n";
+            }
+
+            checkError( semop(sem_id, &operacjaV_ilosc_kas, 1), "Blad podniesienia semafora-3" );
             break;
         }
 
         if(time(NULL) - czas_startu > 10) {
-            checkError( semop(semid_kolejek, &operacjaP, 1), "Blad obnizenia semafora-4" );
+            checkError( semop(sem_id, &operacjaP_nr_kasy, 1), "Blad obnizenia semafora-4" );
             int nr_kolejki_do_zmiany = kolejka->czy_oplaca_sie_zmienic_kolejke(getpid(), aktualnyNr);
-            checkError( semop(semid_kolejek, &operacjaV, 1), "Blad podniesienia semafora-4" );
+            checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-4" );
             if(nr_kolejki_do_zmiany != -1) {
                 komunikat << "[" << "Klient-" << getpid() << "] " << "Zmienia kase z " << aktualnyNr << " do " << nr_kolejki_do_zmiany << "\n";
-                checkError( semop(semid_kolejek, &operacjaP, 1), "Blad obnizenia semafora-5" );
+                checkError( semop(sem_id, &operacjaP_nr_kasy, 1), "Blad obnizenia semafora-5" );
                 kolejka->usun_z_kolejki(getpid(), aktualnyNr);
                 kolejka->dodaj_do_kolejki(getpid(), nr_kolejki_do_zmiany);
-                checkError( semop(semid_kolejek, &operacjaV, 1), "Blad podniesienia semafora-5" );
+                checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-5" );
                 aktualneId = (nr_kolejki_do_zmiany == 1 ? msqid_kolejka_stac1 : msqid_kolejka_stac2);
                 aktualnyNr = nr_kolejki_do_zmiany;
                 czas_startu = time(NULL);
@@ -135,32 +160,9 @@ int main(int argc, char * argv[]) {
         sleep(1);
     }
 
-    operacjaP.sem_num = aktualnyNr;
-    operacjaV.sem_num = aktualnyNr;
-
-    Klient klient = {1 , getpid(), aktualnyNr};
-    klient.wiek = randomTimeWithRange(8, 50);
-    int dlugosc_tekstu = generateProducts(&klient);
-
-    int status = msgsnd(aktualneId, &klient, sizeof(int) * 4 + dlugosc_tekstu, 0);
-    if(status != -1) {
-        komunikat << "[" << "KLIENT-" << getpid() << "] " << "Ide do kasy nr: " << aktualnyNr << "\n";
-    }
-
-    Klient odebrany;
-    memset(&klient, 0, sizeof(Klient)); 
-    int rcvStatus = msgrcv(aktualneId, &odebrany, sizeof(Klient) - sizeof(long int), getpid(), 0);
-
-    if(rcvStatus != -1) {
-        kolejka->usun_z_kolejki(getpid(), aktualnyNr);
-        komunikat << "[" << "KLIENT-" << getpid() << "] " << "ZAKUPY DOKONANE ILOSC PRODUKTÓW " << odebrany.ilosc_produktow << "\n";
-    }
-
-    operacjaP.sem_num = 0;
-    operacjaV.sem_num = 0;
-    komunikat << "WARTOSC SEMAFORA- 1: " << semctl(semid_klienci, 0, GETVAL) << "\n";       
-    checkError( semop(semid_klienci, &operacjaP, 1), "Blad obnizenia semafora" );
-    komunikat << "WARTOSC SEMAFORA- 2: " << semctl(semid_klienci, 0, GETVAL) << "\n";
+    komunikat << "WARTOSC SEMAFORA- 1: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";       
+    checkError( semop(sem_id, &operacjaP_ilosc_klientow, 1), "Blad obnizenia semafora" );
+    komunikat << "WARTOSC SEMAFORA- 2: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n" << "\n";
     
     free(kolejka);

@@ -26,11 +26,10 @@ int main(int argc, char * argv[]) {
     signal(SIGCONT, zacznij_prace);
     signal(SIGTERM, zamknij_kase);
 
-    int semid_klienci = atoi(argv[1]);
+    int sem_id = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_stac1 = atoi(argv[3]);
     int msqid_kolejka_stac2 = atoi(argv[4]);
-    int semid_kolejki = atoi(argv[5]);
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
 
@@ -59,8 +58,8 @@ int main(int argc, char * argv[]) {
             }
 
             if(errno == EINTR) {
-                struct sembuf operacjaP = {0, -1, SEM_UNDO};
-                semop(semid_kolejki, &operacjaP, 1);
+                struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
+                semop(sem_id, &operacjaP, 1);
                 lista_kas->status[findInexOfPid(getpid(), lista_kas)] = 0;
                 continue;
             }
@@ -68,7 +67,7 @@ int main(int argc, char * argv[]) {
 
         alarm(0);
 
-        sleep(randomTime(5));
+        sleep(randomTime(10));
         
         stringstream paragon;
         time_t t = time(0);

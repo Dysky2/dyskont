@@ -13,9 +13,6 @@ int main() {
 
     komunikat << "Pid dyskontu: " << getpid() << "\n";
 
-    const double simulation_speed = 1.0;
-    const int simulation_time = 30;
-    const int startowa_ilosc_kas = 3;
     int ilosc_otwratych_kas = 0;
 
     auto start = chrono::steady_clock::now();
@@ -25,29 +22,33 @@ int main() {
     komunikat << "---    Dyskont otwraty zapraszamy   ---" << "\n";
     komunikat << "---------------------------------------" << "\n\n";
 
-    // Tworze grupe semaforowa składająca sie z  semaforów
-	key_t key = ftok(".", 'A');
-    int semid_klienci = checkError( semget(key, 1, IPC_CREAT|0600), "Blad tworzenie semafora");
-
-    key_t key_kolejek = ftok(".", 'H');
-    int semid_kolejek = checkError( semget(key_kolejek, 3, IPC_CREAT|0600), "Blad utworzenie grupy semaforow");
-
-    semctl(semid_kolejek, 0, SETVAL, 1);
-    semctl(semid_kolejek, 1, SETVAL, 1);
-    semctl(semid_kolejek, 2, SETVAL, 1);
-
-    // Pamiec dzielona dla kas
+	key_t key_sem = ftok(".", 'A');
     key_t key_kasy = ftok(".", 'B');
+    key_t key_kolejka_samo = ftok(".", 'C');
+    key_t key_kolejka_stac1 = ftok(".", 'D');
+    key_t key_kolejka_stac2 = ftok(".", 'E');
+    key_t key_kolejka_obsluga = ftok(".",'F');
+    
+    // Tworze grupe semaforowa składająca sie z  semaforów
+    // 0 -> semafor do koleki samooboslugowej
+    // 1 -> semafor do koleki stacjonarnej 1
+    // 2 -> semafor do koleki stacjonarnej 2
+    // 3 -> semafor liczaczy ilosc klientow w sklepie 
+    // 4 -> semafor odpowiadajacy ile kas aktualnie jest otwartych
+    int sem_id = checkError( semget(key_sem, 5, IPC_CREAT|0600), "Blad utworzenia semaforow" );
+
+    // ustawien wartosc poczatkowych dla semaforow
+    semctl(sem_id, SEMAFOR_SAMOOBSLUGA, SETVAL, 1);
+    semctl(sem_id, SEMAFOR_STAC1, SETVAL, 1);
+    semctl(sem_id, SEMAFOR_STAC2, SETVAL, 1);
+    semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, SETVAL, 0);
+    semctl(sem_id, SEMAFOR_ILOSC_KAS, SETVAL, startowa_ilosc_kas);
+
+    //Tworze pamiec dzielona dla kas
     int shmId_kasy = checkError( shmget(key_kasy, sizeof(kasy), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej");
 
-    key_t key_kolelejki = ftok(".", 'C');
-    int semid_kolejki = checkError( semget(key_kolelejki, 1, IPC_CREAT|0600), "Blad tworzenie semafora");
-
-    // Ustawienie wartosci semafora odrazu na 1 
-    semctl(semid_kolejki, 0, SETVAL, startowa_ilosc_kas);
-
+    // Ustawienie wartosci semafora odrazu na ilosc_kas_startowych 
     kasy * lista_kas = (kasy *) shmat(shmId_kasy, NULL, 0);
-
     lista_kas->sredni_czas_obslugi[0] = CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA;
     lista_kas->sredni_czas_obslugi[1] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
     lista_kas->sredni_czas_obslugi[2] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
@@ -61,23 +62,19 @@ int main() {
     }
 
     // kolejka do kas samoobsługowych
-    key_t key_kolejka = ftok(".", 'D');
-    int msqid_kolejka_samo = checkError( msgget(key_kolejka, IPC_CREAT|0601) , "Blad tworzenia kolejki komunikatow");
+    int msqid_kolejka_samo = checkError( msgget(key_kolejka_samo, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
     // kolejka do kasy stacjonarnej_1
-    key_t key_kolejka_stac1 = ftok(".", 'E');
-    int msqid_kolejka_stac1 = checkError( msgget(key_kolejka_stac1, IPC_CREAT|0602) , "Blad tworzenia kolejki komunikatow");
+    int msqid_kolejka_stac1 = checkError( msgget(key_kolejka_stac1, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
     // kolejka do kas stacjonarnej_2
-    key_t key_kolejka_stac2 = ftok(".", 'F');
-    int msqid_kolejka_stac2 = checkError( msgget(key_kolejka_stac2, IPC_CREAT|0603) , "Blad tworzenia kolejki komunikatow");
+    int msqid_kolejka_stac2 = checkError( msgget(key_kolejka_stac2, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
     // kolejka do obsługi 
-    key_t key_kolejka_obsluga = ftok(".",'G');
-    int msqid_kolejka_obsluga = checkError( msgget(key_kolejka_obsluga, IPC_CREAT|0604) , "Blad tworzenia kolejki komunikatow");
+    int msqid_kolejka_obsluga = checkError( msgget(key_kolejka_obsluga, IPC_CREAT|0600) , "Blad tworzenia kolejki komunikatow");
 
-    int kieroid = checkError(fork(), "Blad utowrzenia forka");
-    if (kieroid == 0) {
+    int kierownik_pid = checkError(fork(), "Blad utowrzenia forka");
+    if (kierownik_pid == 0) {
         checkError(
                 execlp("tmux", 
                         "tmux", 
@@ -113,10 +110,9 @@ int main() {
                 checkError( 
                     execl(
                         "./kasa", "kasa", 
-                        to_string(semid_klienci).c_str(), 
+                        to_string(sem_id).c_str(), 
                         to_string(shmId_kasy).c_str(), 
                         to_string(msqid_kolejka_samo).c_str(),
-                        to_string(semid_kolejki).c_str(), 
                         to_string(msqid_kolejka_obsluga).c_str(),
                         NULL
                     ),
@@ -138,11 +134,10 @@ int main() {
                 checkError( 
                     execl(
                         "./kasjer", "kasjer", 
-                        to_string(semid_klienci).c_str(), 
+                        to_string(sem_id).c_str(), 
                         to_string(shmId_kasy).c_str(), 
                         to_string(msqid_kolejka_stac1).c_str(), 
                         to_string(msqid_kolejka_stac2).c_str(), 
-                        to_string(semid_kolejki).c_str(),
                         NULL
                     ),
                     "Blad wywolania execa"
@@ -166,13 +161,11 @@ int main() {
         if(id==0) {
             checkError( 
                 execl("./klient", "klient", 
-                    to_string(semid_klienci).c_str(), 
+                    to_string(sem_id).c_str(), 
                     to_string(shmId_kasy).c_str(), 
                     to_string(msqid_kolejka_samo).c_str(), 
                     to_string(msqid_kolejka_stac1).c_str(), 
                     to_string(msqid_kolejka_stac2).c_str(), 
-                    to_string(semid_kolejki).c_str(),
-                    to_string(semid_kolejek).c_str(),
                     NULL
                 ), 
                 "Blad exec" 
@@ -184,13 +177,13 @@ int main() {
         // otwarcie kasy stacjonarnej 1
         if(lista_kas->dlugosc_kolejki[0] > 3 && lista_kas->status[6] == 0) {
             lista_kas->status[6] = 1;
-            struct sembuf operacjaV = {0, 1, SEM_UNDO};
-            semop(semid_kolejki, &operacjaV, 1);
+            struct sembuf operacjaV = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
+            semop(sem_id, &operacjaV, 1);
             kill(lista_kas->pid_kasy[6], SIGCONT);
         }
 
         // 5 10 15
-        if(semctl(semid_klienci, 0, GETVAL) < 5 * (ilosc_otwratych_kas - 3)) {
+        if(semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) < 5 * (ilosc_otwratych_kas - 3)) {
             komunikat << "ZAMYKAM KASE " << "\n" << "\n";
             for(int i=6;i> 0;i--) {
                 if(lista_kas->status[i] == 1) {
@@ -199,8 +192,8 @@ int main() {
                     lista_kas->status[i]=0;
                     lista_kas->pid_kasy[i]=0;
 
-                    struct sembuf operacjaP = {0, -1, SEM_UNDO};
-                    semop(semid_kolejki, &operacjaP, 1);
+                    struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
+                    semop(sem_id, &operacjaP, 1);
                     msgsnd(msqid_kolejka_samo, &klient, sizeof(klient)-sizeof(long), 0);
                     ilosc_otwratych_kas--;
                     break;
@@ -209,7 +202,7 @@ int main() {
         }
 
         // 15 20 25
-        if (semctl(semid_klienci, 0, GETVAL) >= ilosc_otwratych_kas * 5 && ilosc_otwratych_kas <= 5) {
+        if (semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) >= ilosc_otwratych_kas * 5 && ilosc_otwratych_kas <= 5) {
 
             int wolny_status = -1;
             for(int i =0;i <6;i++) {
@@ -221,12 +214,12 @@ int main() {
             if(wolny_status != -1) {
                 ilosc_otwratych_kas++;
                 lista_kas->status[wolny_status] = 1;
-                struct sembuf operacjaV = {0, 1, SEM_UNDO};
-                semop(semid_kolejki, &operacjaV, 1);
+                struct sembuf operacjaV = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
+                semop(sem_id, &operacjaV, 1);
                 kill(lista_kas->pid_kasy[wolny_status], SIGCONT);
             }
         }
-        komunikat << "WARTOSC SEMAFORA: " << semctl(semid_klienci, 0, GETVAL) << "\n";
+        komunikat << "WARTOSC SEMAFORA: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
 
         komunikat << "Ilosc ludzi w kolejce " << lista_kas->dlugosc_kolejki[0] << "\n";
         komunikat << "Ilosc ludzi w kolejce " << lista_kas->dlugosc_kolejki[1] << "\n";
@@ -234,8 +227,8 @@ int main() {
     }
 
     // czekanie az klienci opuszcza sklep
-    while (semctl(semid_klienci, 0, GETVAL) > 0) {
-        komunikat << "Ilosc ludzi w kolejce IN SEM " << semctl(semid_klienci, 0, GETVAL) << "\n";
+    while (semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
+        komunikat << "Ilosc ludzi w kolejce IN SEM " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
         sleep(2);
     }
 
@@ -272,10 +265,8 @@ int main() {
         checkError(-1, "Blad czekania na klientwo");
     }
 
-    checkError( semctl(semid_klienci, 0, IPC_RMID), "Blad zamknieca semfora");
+    checkError( semctl(sem_id, 0, IPC_RMID), "Blad zamknieca semfora");
     checkError( shmctl(shmId_kasy, IPC_RMID, NULL), "Blad zamkniecia pamieci dzielonj");
-    checkError( semctl(semid_kolejki, 0, IPC_RMID), "Blad zamknieca semfora");
-    checkError( semctl(semid_kolejek, 0, IPC_RMID), "Blad zamknieca semfora");
     checkError( msgctl(msqid_kolejka_samo, IPC_RMID, NULL), "Blad zamkniecia kolejki_samoobslugowej" );
     checkError( msgctl(msqid_kolejka_stac1, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_1" );
     checkError( msgctl(msqid_kolejka_stac2, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );

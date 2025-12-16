@@ -24,9 +24,18 @@
 #define CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA 10
 #define CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA 15
 
-const double simulation_speed = 1.0;
-const int simulation_time = 10;
+#define SEMAFOR_SAMOOBSLUGA 0
+#define SEMAFOR_STAC1 1
+#define SEMAFOR_STAC2 2
+#define SEMAFOR_ILOSC_KLIENTOW 3
+#define SEMAFOR_ILOSC_KAS 4
 
+const double simulation_speed = 1.0;
+const int simulation_time = 20;
+const int startowa_ilosc_kas = 3;
+
+
+// TODO ZAMIAN NAZWY NA Kasy
 struct kasy {
     int pid_kasy[8];
     int status[8]; // 0 -> kasa zamknieta 1 -> kasa otwarta 2-> kasa zajeta
@@ -44,22 +53,37 @@ struct Obsluga {
     int pelnoletni; // -1 -> osobo niepelnetnia 0 -> pelnoletni
 };
 
+struct Klient {
+    long int mtype;
+    int klient_id;
+    int nrKasy;
+    int wiek;
+    int ilosc_produktow;
+    char lista_produktow[MAX_DATA_SIZE];
+};
+
+union semun {
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+    struct seminfo *__buf;
+};
+
 inline int checkError(int result, const char * msg) {
     if (result == -1) {
         perror(msg);
         exit(1);
     }
-
     return result;
-}
+};
 
 inline int randomTime(int time) {
     return rand() % time; 
-}
+};
 
 inline int randomTimeWithRange(int min, int max) {
     return rand() % (max - min + 1) + min; 
-}
+};
 
 struct AtomicLogger {
     std::stringstream bufor;
@@ -78,23 +102,6 @@ struct AtomicLogger {
 };
 
 #define komunikat AtomicLogger()
-
-struct Klient {
-    long int mtype;
-    int klient_id;
-    int nrKasy;
-    int wiek;
-    int ilosc_produktow;
-    char lista_produktow[MAX_DATA_SIZE];
-};
-
-
-union semun {
-    int val;
-    struct semid_ds *buf;
-    unsigned short *array;
-    struct seminfo *__buf;
-};
 
 class Kolejka {
 private: 
@@ -136,6 +143,15 @@ public:
                 lista_kas->dlugosc_kolejki[nr_kolejki]--;
             }
         }
+    }
+
+    void wyswietl_kolejke(int nr_kolejki) {
+        std::stringstream bufor;
+        for(int i=0; i < lista_kas->dlugosc_kolejki[nr_kolejki]; i++) {
+            bufor << lista_kas->kolejka_pid[nr_kolejki][i] << " ";
+        }
+        komunikat << bufor.str() << "\n\n";
+        bufor.clear();
     }
 
     int czy_jestem_pierwszy(int pid_klienta, int nr_kolejki) {
@@ -203,7 +219,7 @@ int findInexOfPid(int pid, kasy * lista) {
         }
     }
     return res;
-}
+};
 
 const std::string kategorieProduktow[10] = {
     "OWOCE",
@@ -254,4 +270,4 @@ inline int wyswietl_cene_produktu(const char * produkt) {
         }
     }
     return 0;
-}
+};

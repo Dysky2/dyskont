@@ -20,11 +20,10 @@ int main(int argc, char * argv[]) {
 
     komunikat << "[KASA-" << getpid() << "]" << " Witam zapraszamy" << "\n";
 
-    int semid_klienci = atoi(argv[1]);
+    int sem_id = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_samo = atoi(argv[3]);
-    int semid_kolejki = atoi(argv[4]);
-    int msqid_kolejka_obsluga = atoi(argv[5]);
+    int msqid_kolejka_obsluga = atoi(argv[4]);
 
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL , 0);
 
@@ -53,7 +52,7 @@ int main(int argc, char * argv[]) {
         }
 
         komunikat << "[KASA-" << getpid() << "-" <<klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
-        sleep(randomTime(8));
+        sleep(randomTime(15));
         
         stringstream paragon;
         time_t t = time(0);
