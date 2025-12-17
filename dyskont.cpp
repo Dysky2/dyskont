@@ -14,7 +14,7 @@ int main() {
     komunikat << "Pid dyskontu: " << getpid() << "\n";
 
     int ilosc_otwratych_kas = 0;
-
+    
     auto start = chrono::steady_clock::now();
     auto end_simulation = start + chrono::seconds( (int) (simulation_time / simulation_speed) );
 
@@ -82,7 +82,11 @@ int main() {
             exit(1);
         }
     
-        string komenda_bash = "cd " + string(cwd) + "; ./kierownik " + to_string(shmId_kasy) + " " + to_string(sem_id) + "; exec bash";
+        string komenda_bash = "cd " + string(cwd) + "; ./kierownik " + 
+                            to_string(shmId_kasy) + " " + 
+                            to_string(sem_id) + " " + 
+                            to_string(msqid_kolejka_stac1) + " " + 
+                            to_string(msqid_kolejka_stac2) +  "; exec bash";
         
         execlp("cmd.exe", 
             "cmd.exe",
@@ -185,7 +189,7 @@ int main() {
                 "Blad exec" 
             );
         } else {
-            checkError( waitpid(-1, NULL, WNOHANG), "Bledne zebranie dziecka");
+            while( waitpid(-1, NULL, WNOHANG) > 0) {}
         }
 
         // otwarcie kasy stacjonarnej 1

@@ -30,7 +30,9 @@ int main(int argc, char * argv[]) {
 
     int shmid_kasy = atoi(argv[1]);
     int sem_id = atoi(argv[2]);
-    
+    int msqid_kolejka_stac1 = atoi(argv[3]);
+    int msqid_kolejka_stac2 = atoi(argv[4]);
+
     kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
     lista_kas->pid_kierownika = getpid();
 
@@ -74,16 +76,36 @@ int main(int argc, char * argv[]) {
                 if(kasa == 1) {
                     if(lista_kas->status[6] == 1) {
                         // TODO opusczenie semafora LICZA_KAS
+
+                        while ( pobierz_ilosc_wiadomosci(msqid_kolejka_stac1) > 0) {
+                            komunikat << "Nie moge zamknac kasy poniewaz, ludzie staoja dalej w kolejce\n";
+                            lista_kas->status[6] = 2;
+
+                            sleep(2);
+                        }
+
                         struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
                         semop(sem_id, &operacjaP, 1);
                         lista_kas->status[6] = 0;
+                    } else {
+                        komunikat << "Kasa jest juz zamknieta\n";
                     }
                 } else if(kasa == 2) {
                     if(lista_kas->status[7] == 1) {
+
+                        while ( pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0) {
+                            komunikat << "Nie moge zamknac kasy poniewaz, ludzie staoja dalej w kolejce\n";
+                            lista_kas->status[7] = 2;
+
+                            sleep(2);
+                        }
+
+                        struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
+                        semop(sem_id, &operacjaP, 1);
                         lista_kas->status[7] = 0;
                     }
                 } else {
-                    komunikat << "Podano zla kase\n";
+                    komunikat << "Kasa jest juz zamknieta\n";
                 }
 
                 break;
@@ -91,6 +113,7 @@ int main(int argc, char * argv[]) {
 
                 break;
             case 4:
+                komunikat << "Kierownik opusza dyskont\n";
                 exit(0);
                 break;
             default:

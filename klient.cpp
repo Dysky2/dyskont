@@ -122,23 +122,6 @@ int main(int argc, char * argv[]) {
             klient.wiek = randomTimeWithRange(8, 50);
             int dlugosc_tekstu = generateProducts(&klient);
 
-            if(aktualnyNr != 0 && lista_kas->status[aktualnyNr == 1 ? 6 : 7] == 0) {
-                komunikat << "Kasa docelowa zostala zamknieta, prosze znalesc inna kase\n";
-                checkError( semop(sem_id, &operacjaP_nr_kasy, 1), "Blad obnizenia semafora-5" );
-                kolejka->usun_z_kolejki(getpid(), aktualnyNr);
-                kolejka->dodaj_do_kolejki(getpid(), 0);
-                checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-5" );
-                
-                aktualnyNr = 0;
-                aktualneId = msqid_kolejka_samo;
-
-                struct sembuf operacjaV = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
-                semop(sem_id, &operacjaV, 1);
-
-                czas_startu = time(NULL);
-                continue;
-            }
-
             int status = msgsnd(aktualneId, &klient, sizeof(int) * 4 + dlugosc_tekstu, 0);
             if(status != -1) {
                 checkError( semop(sem_id, &operacjaP_nr_kasy, 1), "Blad obnizenia semafora-2" );

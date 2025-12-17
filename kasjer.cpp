@@ -46,24 +46,11 @@ int main(int argc, char * argv[]) {
         int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
 
         if(lista_kas->status[nr_kasy] == 0) {
-            struct msqid_ds buf;
-            while (pobierz_ilosc_wiadomosci(id_kasy) > 0) {
-                komunikat << "POSIADAM komunikaty u siebie\n";
-
-                Klient klient_do_zwrotu;
-                memset(&klient_do_zwrotu, 0, sizeof(Klient)); 
-                checkError(msgrcv(id_kasy, &klient_do_zwrotu, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR), "Bledne odebranie wiadomosci kiedy kasa jest zamknieta");
-
-                if(kill(klient_do_zwrotu.klient_id, 0) == 0) {
-                    klient_do_zwrotu.mtype = klient_do_zwrotu.klient_id;
-                    klient_do_zwrotu.klient_id = -1;
-                    msgsnd(id_kasy, &klient_do_zwrotu, sizeof(Klient) - sizeof(long int), 0);
-                }
-
+            if(pobierz_ilosc_wiadomosci(id_kasy) <= 0) {
+                alarm(2);
+                pause();
+                continue;
             }
-            alarm(2);
-            pause();
-            continue;
         } 
 
         komunikat << "KASJER NORMALNIE SMIGA " << nr_kasy << "\n\n\n";
@@ -77,7 +64,7 @@ int main(int argc, char * argv[]) {
         }
 
         if(status == -1) {
-            if(errno == EINTR && (lista_kas->dlugosc_kolejki[1] > 0 || lista_kas->dlugosc_kolejki[2] > 0)) {
+            if(errno == EINTR && (lista_kas->dlugosc_kolejki[nr_kasy] > 0)) {
                 continue;
             }
 
