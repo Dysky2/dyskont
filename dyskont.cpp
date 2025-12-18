@@ -9,6 +9,15 @@ volatile sig_atomic_t ewakuacja = 0;
 
 int shmId_kasy = 0, sem_id = 0, obsluga_id = 0, shm_id_klienci=0;
 
+void usun_zombie(int) {
+
+    int saved_ernno = errno;
+
+    while( waitpid(-1, NULL, WNOHANG) > 0);
+
+    errno = saved_ernno;
+}
+
 void wylacz_sklep(int) {
     komunikat << "ZARZADAM ZAMKNIECIE SKLEPU\n";
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmId_kasy, NULL, 0);
@@ -23,36 +32,55 @@ void wylacz_sklep(int) {
     }
 
     while(semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
-        
-        for(int i=0;i < dane_klientow->ilosc;i++) {
-            int pid_do_ubica = dane_klientow->lista_klientow[i];
-            kill(pid_do_ubica, SIGTERM);
-        }
         sleep(1);
+        for(int i=0;i < dane_klientow->ilosc;i++) {
+            usleep(1000000);
+            int pid_do_ubica = dane_klientow->lista_klientow[i];
+            if(pid_do_ubica > 0) kill(pid_do_ubica, SIGTERM);
+        }
+
+        while(waitpid(-1, NULL, WNOHANG) > 0); 
     }
 
     if(obsluga_id > 0) {
-        kill(obsluga_id, SIGTERM);
+        int wynik = kill(obsluga_id, SIGTERM);
+        if(wynik == -1) {
+            if(errno != ESRCH) {
+                perror("Blad wyslania SIGTERM do obslugi");
+            }
+        }
     }
 
     for(int i =0;i<8;i++) {
-        kill(stan_dyskontu->pid_kasy[i], SIGTERM);
+        int wynik = kill(stan_dyskontu->pid_kasy[i], SIGTERM);
+
+        if(wynik == -1) {
+            if(errno != ESRCH) {
+                perror("Blad wyslania SIGTERM do obslugi");
+            }
+        }
     }
 
 }
 
 int main() {
-    srand(time(0));
+    srand(time(0) + getpid());
 
     komunikat << "Pid dyskontu: " << getpid() << "\n";
 
     int ilosc_otwratych_kas = 0;
+
+    if(signal(SIGCHLD, usun_zombie) == SIG_ERR) {
+        perror("[DYSKONT] Sygnal SIGCHLD nie zostal wykonany poprawnie");
+        exit(EXIT_FAILURE);
+    }
 
     if(signal(SIGTERM, wylacz_sklep) == SIG_ERR) {
         perror("[DYSKONT] Sygnal SIGTERM nie zostal wykonany poprawnie");
         exit(EXIT_FAILURE);
     }
 
+    
     auto start = chrono::steady_clock::now();
     auto end_simulation = start + chrono::seconds( (int) (simulation_time / simulation_speed) );
 
@@ -245,12 +273,11 @@ int main() {
             );
         } else {
             struct sembuf operacjaP = {SEMAFOR_LISTA_KLIENTOW, -1, SEM_UNDO};
-            semop(sem_id, &operacjaP, 1);
-            lista_klientow->dodaj_klienta_do_listy(id);
-            struct sembuf operacjaV = {SEMAFOR_LISTA_KLIENTOW, 1, SEM_UNDO};
-            semop(sem_id, &operacjaV, 1);
-
-            while( waitpid(-1, NULL, WNOHANG) > 0) {}
+            if(semop(sem_id, &operacjaP, 1) == 0) {
+                lista_klientow->dodaj_klienta_do_listy(id);
+                struct sembuf operacjaV = {SEMAFOR_LISTA_KLIENTOW, 1, SEM_UNDO};
+                semop(sem_id, &operacjaV, 1);
+            }
         }
 
         // otwarcie kasy stacjonarnej 1
@@ -258,7 +285,7 @@ int main() {
             stan_dyskontu->status_kasy[6] = 1;
             struct sembuf operacjaV = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
             semop(sem_id, &operacjaV, 1);
-            kill(stan_dyskontu->pid_kasy[6], SIGCONT);
+            kill(stan_dyskontu->pid_kasy[6], SIGUSR2);
         }
 
         // 5 10 15
@@ -271,9 +298,10 @@ int main() {
                     stan_dyskontu->pid_kasy[i]=0;
 
                     struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
-                    semop(sem_id, &operacjaP, 1);
-                    msgsnd(msqid_kolejka_samo, &klient, sizeof(klient)-sizeof(long), 0);
-                    ilosc_otwratych_kas--;
+                    if(semop(sem_id, &operacjaP, 1) == 0) {
+                        msgsnd(msqid_kolejka_samo, &klient, sizeof(klient)-sizeof(long), 0);
+                        ilosc_otwratych_kas--;
+                    }
                     break;
                 }
             }
@@ -294,7 +322,7 @@ int main() {
                 stan_dyskontu->status_kasy[wolny_status] = 1;
                 struct sembuf operacjaV = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
                 semop(sem_id, &operacjaV, 1);
-                kill(stan_dyskontu->pid_kasy[wolny_status], SIGCONT);
+                kill(stan_dyskontu->pid_kasy[wolny_status], SIGUSR1);
             }
         }
         komunikat << "WARTOSC SEMAFORA: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
@@ -306,6 +334,7 @@ int main() {
 
     // czekanie az klienci opuszcza sklep
     while (semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
+        if(ewakuacja) break;
         komunikat << "Ilosc ludzi w kolejce IN SEM " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
         sleep(2);
     }
@@ -315,7 +344,6 @@ int main() {
         // Zakonczenie działania obłsugi
         Obsluga obsluga = {1, -1, -1, 0, 0};
         checkError( msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(obsluga) - sizeof(long int), 0), "Blad zamkniecia oblsugi" );
-        
         
         // Wyslanie wiadomosci o zamkniecie kas
         komunikat << "[DYSKONT]" << "WYLACZENIE KAS" << "\n";

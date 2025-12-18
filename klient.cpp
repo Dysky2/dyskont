@@ -130,7 +130,7 @@ int main(int, char * argv[]) {
                 exit(EXIT_FAILURE);
             }
         }
-
+        
         int czy_jestem_pierwszy = kolejka->czy_jestem_pierwszy(getpid(), aktualnyNr);
         checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-2" );
         
@@ -166,7 +166,6 @@ int main(int, char * argv[]) {
             memset(&klient, 0, sizeof(Klient)); 
             int rcvStatus = msgrcv(aktualneId, &odebrany, sizeof(Klient) - sizeof(long int), getpid(), 0);
 
-        
             if(rcvStatus == -1) {
                 if(errno == EINTR) {
                     checkError( semop(sem_id, &operacjaV_ilosc_kas, 1), "Blad podniesienia semafora odpowiedzialnego za ilosc_kas" );
@@ -220,6 +219,5 @@ int main(int, char * argv[]) {
     komunikat << "WARTOSC SEMAFORA- 2: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n" << "\n";
     
-    raise(SIGKILL);
     exit(0);
 }

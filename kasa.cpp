@@ -17,7 +17,7 @@ void zacznij_prace(int) { }
 int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
 
-    signal(SIGCONT, zacznij_prace);
+    signal(SIGUSR1, zacznij_prace);
     signal(SIGTERM, zamknij_kase);
     signal(SIGUSR2, przerwij_prace);
 
@@ -56,27 +56,23 @@ int main(int argc, char * argv[]) {
             pause();
             continue;
         }
+
         Klient klient;
         memset(&klient, 0, sizeof(Klient)); 
-        int status = msgrcv(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR);
+        int status = msgrcv(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 1, 0);
 
-        if (klient.ilosc_produktow == -1 || klient.klient_id == getpid()) {
-            break;
-        }
+        if (klient.ilosc_produktow == -1 || klient.klient_id == getpid()) break;
 
         if(status == -1) {
-            if(errno == EINTR) {
-                continue;
-            }
+            if(errno == EINTR) continue;
+            else break;
         }
 
         komunikat << "[KASA-" << getpid() << "-" <<klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
         
         sleep(randomTime(15));
         
-        if(!czy_kasa_otwarta) {
-            continue;
-        }
+        if(!czy_kasa_otwarta) continue;
 
         stringstream paragon;
         time_t t = time(0);
@@ -98,15 +94,21 @@ int main(int argc, char * argv[]) {
         paragon << "| Towar                    Wartosc |" << "\n";
         paragon << "|                                  |" << "\n";
 
-        int aktualna_pozycja = 0, suma = 0;
+        int aktualna_pozycja = 0, suma = 0 , transakcja_udana = 1;
         for(int i=0;i < klient.ilosc_produktow;i++) {
+
+            if(!czy_kasa_otwarta) {
+                transakcja_udana = 0;
+                break; 
+            }
 
             // 2% szans ze kasa utknie
             if(randomTimeWithRange(1, 100) > 98) {
 
                 if(semop(sem_id, &operacjaP, 1) == -1) {
-                    if(errno == EINTR) {
+                    if(errno == EINTR || errno == EIDRM || errno == EINVAL) {
                         paragon.clear();
+                        transakcja_udana = 0;
                         break;
                     } else{ 
                         perror("Bledne opuszczenie semafor z OBSLUGI");
@@ -123,6 +125,7 @@ int main(int argc, char * argv[]) {
                         "Blad wyslania komuniaktu to obslugi o sprawdzenie pelnoletnosci przez kase"
                     );
                 } else {
+                    transakcja_udana = 0;
                     checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
                     break;
                 }
@@ -130,8 +133,8 @@ int main(int argc, char * argv[]) {
                 int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
 
                 if(rcvStatus == -1 || !czy_kasa_otwarta) {
-                    if(errno == EINTR || !czy_kasa_otwarta) {
-                        paragon.clear();
+                    if(errno == EINTR) {
+                        transakcja_udana = 0;
                         checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
                         break;
                     } else {
@@ -147,8 +150,8 @@ int main(int argc, char * argv[]) {
             if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
                     
                 if(semop(sem_id, &operacjaP, 1) == -1) {
-                    if(errno == EINTR) {
-                        paragon.clear();
+                    if(errno == EINTR || errno == EINVAL) {
+                        transakcja_udana = 0;
                         break;
                     } else{ 
                         perror("Bledne opuszczenie semafor z OBSLUGI");
@@ -163,6 +166,7 @@ int main(int argc, char * argv[]) {
                         "Blad wyslania komuniaktu to obslugi o sprawdzenie pelnoletnosci przez kase"
                     );
                 } else {
+                    transakcja_udana = 0;
                     checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
                     break;
                 }
@@ -171,7 +175,7 @@ int main(int argc, char * argv[]) {
 
                 if(rcvStatus == -1 || !czy_kasa_otwarta) {
                     if(errno == EINTR || !czy_kasa_otwarta) {
-                        paragon.clear();
+                        transakcja_udana = 0;
                         checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
                         break;
                     } else {
@@ -203,7 +207,8 @@ int main(int argc, char * argv[]) {
             aktualna_pozycja += strlen(produkt) + 1;
         }
 
-        if(!czy_kasa_otwarta) {
+        if(!czy_kasa_otwarta || !transakcja_udana) {
+            paragon.str("");
             paragon.clear();
             continue;
         }
@@ -235,7 +240,7 @@ int main(int argc, char * argv[]) {
         paragon << "| ||| || ||| | ||| || || ||| | ||| |\n";
         paragon << "| ||| || ||| | ||| || || ||| | ||| |\n";
         paragon << "| ||| || ||| | ||| || || ||| | ||| |\n";
-        paragon << "|    0023    " << left << setw(5) << klient.klient_id << "      9912       |\n";
+        paragon << "|    0023    " << left << setw(10) << klient.klient_id << "    9912    |\n";
         paragon << "|                                  |\n";
         paragon << "| DZIEKUJEMY I ZAPRASZAMY PONOWNIE |\n";
         paragon << "'=================================='" << "\n"; 

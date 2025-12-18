@@ -33,7 +33,7 @@ int main(int, char * argv[]) {
     signal(SIGALRM, wstrzymaj_kase);
     signal(SIGUSR1, otworz_kase_stac2);
     signal(SIGUSR2, przerwij_prace);
-    signal(SIGCONT, zacznij_prace);
+    // signal(SIGCONT, zacznij_prace);
     signal(SIGTERM, zamknij_kase);
 
     int sem_id = atoi(argv[1]);
@@ -52,25 +52,29 @@ int main(int, char * argv[]) {
             if(pobierz_ilosc_wiadomosci(id_kasy) <= 0) {
                 alarm(2);
                 pause();
+                alarm(0);
                 continue;
             }
         } 
-
         komunikat << "KASJER NORMALNIE SMIGA " << nr_kasy << "\n\n\n";
-        alarm(10);  
+
         Klient klient;
-        memset(&klient, 0, sizeof(Klient)); 
+        memset(&klient, 0, sizeof(Klient));
+
+        // Po ilu ma sie kasa wylaczyc -- domyslnie 30
+        alarm(10);  
         int status = msgrcv(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR);
+        alarm(0);
 
         if(klient.ilosc_produktow == -1 || klient.klient_id==getpid()) {
             break;
         }
 
         if(status == -1) {
-            if(errno == EINTR && (stan_dyskontu->dlugosc_kolejki[nr_kasy] > 0)) {
+            if(errno == EINTR && (stan_dyskontu->dlugosc_kolejki[nr_kasy == 6 ? 1 : 2] > 0)) {
                 continue;
             }
-
+            if(errno == EIDRM || errno == EINVAL) break;
             if(errno == EINTR) {
                 komunikat << "Zamykam kase o pidzie: " << getpid() << "\n";
                 struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
@@ -81,13 +85,10 @@ int main(int, char * argv[]) {
         }
 
         komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
-        alarm(0);
 
         sleep(randomTime(15));
 
-        if(!czy_kasa_otwarta) {
-            continue;
-        }
+        if(!czy_kasa_otwarta) continue;
         
         stringstream paragon;
         time_t t = time(0);

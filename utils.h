@@ -331,6 +331,10 @@ inline int randomTimeWithRange(int min, int max) {
 };
 
 inline int pobierz_ilosc_wiadomosci(int msqid) {
+    if(msqid < 0) {
+        return -1;
+    }
+
     struct msqid_ds buf;
 
     if (msgctl(msqid, IPC_STAT, &buf) == -1) {

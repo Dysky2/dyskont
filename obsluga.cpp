@@ -22,12 +22,18 @@ int main(int, char * argv[]) {
         int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 1, 0);
 
         if(obsluga.powod == -1) {
-            break;
+            komunikat << "[OBSLUGA] " << "Koncze prace " << "\n";
+            exit(0);
         }
 
         if(rcvStatus == -1) {
             if (errno == EINTR) {
                 break;
+            } else if(errno == EIDRM || errno == EINVAL) {
+                break;
+            } else {
+                perror("Blad podczas odbierania komuniaktu z kolejki");
+                exit(EXIT_FAILURE);
             }
         }
 
@@ -35,7 +41,8 @@ int main(int, char * argv[]) {
             // Czas az obsluga podejdzie do kasy
             sleep(6);
             if(!czy_obsluguje) {
-                continue;
+                komunikat << "[OBSLUGA] " << "Koncze prace " << "\n";
+                exit(0);
             }
 
             if(obsluga.wiek_klienta >= 18) {
@@ -50,14 +57,17 @@ int main(int, char * argv[]) {
             sleep(6);  
             
             if(!czy_obsluguje) {
-                continue;
+                komunikat << "[OBSLUGA] " << "Koncze prace " << "\n";
+                exit(0);
             }
             komunikat << "[OBSLUGA] " << "Waga przy kasie " << obsluga.kasa_id << " zostala naprawiona\n";
         }
 
 
         obsluga.mtype = obsluga.kasa_id;
-        msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0);
+        if(kill(obsluga.kasa_id, 0) == 0) {
+            msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0);
+        }
     }
 
     komunikat << "[OBSLUGA] " << "Koncze prace " << "\n";
