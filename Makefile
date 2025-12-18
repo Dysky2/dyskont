@@ -21,4 +21,4 @@ kierownik: kierownik.cpp utils.h
 	g++ $(CFLAGS) kierownik.cpp -o kierownik
 
 clean:
-	rm -f dyskont klient kasa kasjer obsluga *.o
+	rm -f dyskont klient kasa kasjer obsluga kierownik *.o

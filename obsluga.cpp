@@ -4,22 +4,40 @@
 
 using namespace std;
 
-int main(int argc, char * argv[]) {
+volatile sig_atomic_t czy_obsluguje = 1; 
+
+void opusc_sklep(int) {
+    czy_obsluguje = 0;
+}
+
+int main(int, char * argv[]) {
     komunikat << "[OBSLUGA] " << "Witam " << "\n";
+
+    signal(SIGTERM, opusc_sklep);
 
     int msqid_kolejka_obsluga = atoi(argv[1]);
 
-    while(1) {
+    while(czy_obsluguje) {
         Obsluga obsluga;
-        msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 1, 0);
+        int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 1, 0);
 
         if(obsluga.powod == -1) {
             break;
         }
 
+        if(rcvStatus == -1) {
+            if (errno == EINTR) {
+                break;
+            }
+        }
+
         if(obsluga.powod == 1) {
             // Czas az obsluga podejdzie do kasy
-            sleep(2);
+            sleep(6);
+            if(!czy_obsluguje) {
+                continue;
+            }
+
             if(obsluga.wiek_klienta >= 18) {
                 obsluga.pelnoletni = 0;
                 komunikat << "[OBSLUGA] " << "Klient jest pelnoletni, moze kupic alkohol, przy kasie: " << obsluga.kasa_id << "\n";
@@ -29,7 +47,11 @@ int main(int argc, char * argv[]) {
             }
         } else if(obsluga.powod == 2) {
             // Czas az obsługa poprawi kase
-            sleep(2);
+            sleep(6);  
+            
+            if(!czy_obsluguje) {
+                continue;
+            }
             komunikat << "[OBSLUGA] " << "Waga przy kasie " << obsluga.kasa_id << " zostala naprawiona\n";
         }
 

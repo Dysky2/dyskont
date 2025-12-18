@@ -6,12 +6,12 @@ using namespace std;
 
 volatile sig_atomic_t czy_kierownik_ma_dzialac = 1; 
 
-void zamknij_kierownika(int sig) {
+void zamknij_kierownika(int) {
     czy_kierownik_ma_dzialac = 0;
 }
-void kontynuj_prace(int sig) {}
+void kontynuj_prace(int) {}
 
-int main(int argc, char * argv[]) {
+int main(int, char * argv[]) {
     komunikat << "Kierownik wchodzi do dyskontu\n";
 
     struct sigaction sa_term;
@@ -33,8 +33,8 @@ int main(int argc, char * argv[]) {
     int msqid_kolejka_stac1 = atoi(argv[3]);
     int msqid_kolejka_stac2 = atoi(argv[4]);
 
-    kasy * lista_kas = (kasy *) shmat(shmid_kasy, NULL, 0);
-    lista_kas->pid_kierownika = getpid();
+    StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
+    stan_dyskontu->pid_kierownika = getpid();
 
     int show_panel = 1;
 
@@ -63,9 +63,9 @@ int main(int argc, char * argv[]) {
         int kasa = 0;
         switch (option) {
             case 1:
-                if(lista_kas->status[7] == 0) {
+                if(stan_dyskontu->status_kasy[7] == 0) {
                     // TODO podniesie semafora z liczba_kas
-                    kill(lista_kas->pid_kasy[7], SIGUSR1);
+                    kill(stan_dyskontu->pid_kasy[7], SIGUSR1);
                 } else {
                     komunikat << "Ta kasa jest juz otwarta\n";
                 }
@@ -74,43 +74,43 @@ int main(int argc, char * argv[]) {
                 komunikat << "Wybierz kase 1 lub 2: ";
                 cin >> kasa;
                 if(kasa == 1) {
-                    if(lista_kas->status[6] == 1) {
+                    if(stan_dyskontu->status_kasy[6] == 1) {
                         // TODO opusczenie semafora LICZA_KAS
 
                         while ( pobierz_ilosc_wiadomosci(msqid_kolejka_stac1) > 0) {
                             komunikat << "Nie moge zamknac kasy poniewaz, ludzie staoja dalej w kolejce\n";
-                            lista_kas->status[6] = 2;
+                            stan_dyskontu->status_kasy[6] = 2;
 
                             sleep(2);
                         }
 
                         struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
                         semop(sem_id, &operacjaP, 1);
-                        lista_kas->status[6] = 0;
+                        stan_dyskontu->status_kasy[6] = 0;
                     } else {
                         komunikat << "Kasa jest juz zamknieta\n";
                     }
                 } else if(kasa == 2) {
-                    if(lista_kas->status[7] == 1) {
+                    if(stan_dyskontu->status_kasy[7] == 1) {
 
                         while ( pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0) {
                             komunikat << "Nie moge zamknac kasy poniewaz, ludzie staoja dalej w kolejce\n";
-                            lista_kas->status[7] = 2;
+                            stan_dyskontu->status_kasy[7] = 2;
 
                             sleep(2);
                         }
 
                         struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
                         semop(sem_id, &operacjaP, 1);
-                        lista_kas->status[7] = 0;
+                        stan_dyskontu->status_kasy[7] = 0;
                     }
                 } else {
                     komunikat << "Kasa jest juz zamknieta\n";
                 }
-
                 break;
             case 3:
-
+                komunikat << "Kierownik zarzadzil zamkniecie sklepu\n";
+                kill(stan_dyskontu->pid_dyskontu, SIGTERM);
                 break;
             case 4:
                 komunikat << "Kierownik opusza dyskont\n";
