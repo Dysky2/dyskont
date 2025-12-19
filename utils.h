@@ -13,7 +13,7 @@
 #include <sstream>
 #include <cstring>
 #include <iomanip>
-#include <ctime>
+#include <time.h>
 #include <limits.h>
 
 // -- DEFINICJE MAKSYMALNYCH WARTOSCI --
@@ -42,7 +42,7 @@
 // -- ZMIENNE GLOBALNE -- 
 
 const double simulation_speed = 1.0;
-const int simulation_time = 40;
+const int simulation_time = 20;
 const int startowa_ilosc_kas = 3;
 
 // -- STRUKTURY --
@@ -76,8 +76,29 @@ struct Klient {
     char lista_produktow[MAX_DATA_SIZE];
 };
 
+void pobierz_aktualny_czas(struct tm *aktualny_czas) {
+
+    if(aktualny_czas == NULL) {
+        perror("Podano nie prawidlowa strukturte czasu");
+        exit(EXIT_FAILURE);
+    }
+
+    time_t czas = time(NULL);
+    *aktualny_czas = *localtime(&czas);
+};
+
+
+
 struct AtomicLogger {
     std::stringstream bufor;
+    struct tm aktualny_czas;
+    char bufor_czas[64];
+
+    AtomicLogger() {
+        pobierz_aktualny_czas(&aktualny_czas);
+        strftime(bufor_czas, 64, "%H:%M:%S | ", &aktualny_czas);
+        bufor << bufor_czas;
+    }
 
     ~AtomicLogger() {
         // bufor << "\n";

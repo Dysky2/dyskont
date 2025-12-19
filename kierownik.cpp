@@ -34,6 +34,12 @@ int main(int, char * argv[]) {
     int msqid_kolejka_stac2 = atoi(argv[4]);
 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
+
+    if(stan_dyskontu == (void*) -1) {
+        perror("Bledne podlaczenie pamieci dzielonej w kierowniku");
+        exit(EXIT_FAILURE);
+    }
+
     stan_dyskontu->pid_kierownika = getpid();
 
     int show_panel = 1;
@@ -42,20 +48,22 @@ int main(int, char * argv[]) {
         int option = 0;
         if(show_panel) {
             komunikat << "Panel kierownika, opcje do wybrania: \n";
-            komunikat << "1. Otwarcie Kasy 2\n2.Zamknij kase (1 lub 2)\n3.Koniec dyskontu\n";
+            komunikat << "1.Otwarcie Kasy 2\n";
+            komunikat << "2.Zamknij kase (1 lub 2)\n";
+            komunikat << "3.Koniec dyskontu\n";
         }
 
         alarm(10);
-
         if(cin >> option) {
             alarm(0);
             show_panel = 1;
         } else {
+            alarm(0);
             show_panel = 0;
             if(czy_kierownik_ma_dzialac == 0) {
                 break;
             }
-
+            cin.ignore(32767, '\n');
             cin.clear();
             continue;
         }
@@ -65,13 +73,14 @@ int main(int, char * argv[]) {
             case 1:
                 if(stan_dyskontu->status_kasy[7] == 0) {
                     // TODO podniesie semafora z liczba_kas
+                    komunikat << "Zarzadam otwarcie kasy stacjonarnej 2";
                     kill(stan_dyskontu->pid_kasy[7], SIGUSR1);
                 } else {
                     komunikat << "Ta kasa jest juz otwarta\n";
                 }
                 break;
             case 2:
-                komunikat << "Wybierz kase 1 lub 2: ";
+                komunikat << "Wybierz kase 1 lub 2: \n";
                 cin >> kasa;
                 if(kasa == 1) {
                     if(stan_dyskontu->status_kasy[6] == 1) {
@@ -103,13 +112,16 @@ int main(int, char * argv[]) {
                         struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
                         semop(sem_id, &operacjaP, 1);
                         stan_dyskontu->status_kasy[7] = 0;
+                    }else {
+                        komunikat << "Kasa jest juz zamknieta\n";
                     }
                 } else {
-                    komunikat << "Kasa jest juz zamknieta\n";
+                    komunikat << "Podano niepoprawny komunikat\n";
                 }
                 break;
             case 3:
                 komunikat << "Kierownik zarzadzil zamkniecie sklepu\n";
+                show_panel = 0;
                 kill(stan_dyskontu->pid_dyskontu, SIGTERM);
                 break;
             case 4:
@@ -122,6 +134,6 @@ int main(int, char * argv[]) {
         }
     }
 
-    komunikat << "Kierownik opusza dyskont\n";
+    komunikat << "Kierownik opusza dyskont \n";
     exit(0);
 }

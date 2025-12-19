@@ -56,7 +56,6 @@ int main(int, char * argv[]) {
                 continue;
             }
         } 
-        komunikat << "KASJER NORMALNIE SMIGA " << nr_kasy << "\n\n\n";
 
         Klient klient;
         memset(&klient, 0, sizeof(Klient));
@@ -76,7 +75,7 @@ int main(int, char * argv[]) {
             }
             if(errno == EIDRM || errno == EINVAL) break;
             if(errno == EINTR) {
-                komunikat << "Zamykam kase o pidzie: " << getpid() << "\n";
+                komunikat << "[Kasjer-" << getpid() << "] " << "Zamykam kase gdzy nie pojawil sie zaden klient: "<< "\n";
                 struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
                 semop(sem_id, &operacjaP, 1);
                 stan_dyskontu->status_kasy[nr_kasy] = 0;
@@ -91,10 +90,10 @@ int main(int, char * argv[]) {
         if(!czy_kasa_otwarta) continue;
         
         stringstream paragon;
-        time_t t = time(0);
-        struct tm * timeinfo = localtime(&t);
+        struct tm timeinfo;
+        pobierz_aktualny_czas(&timeinfo);
         char bufor_czasu[80];
-        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", timeinfo);
+        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", &timeinfo);
 
         paragon << "\n";
         paragon << ".==================================." << "\n";
@@ -178,6 +177,6 @@ int main(int, char * argv[]) {
         komunikat << "Ilosc ludzi w kolejce OD KASJERA " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
     }
 
-    komunikat  << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n" << "\n";
+    komunikat  << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n";
     exit(0);
 }

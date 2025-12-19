@@ -135,10 +135,9 @@ int main(int, char * argv[]) {
         checkError( semop(sem_id, &operacjaV_nr_kasy, 1), "Blad podniesienia semafora-2" );
         
         if(czy_jestem_pierwszy) {
-            komunikat << "\nILSOC KAS: " << semctl(sem_id, SEMAFOR_ILOSC_KAS, GETVAL) <<  "\n";
-            komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
-            komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
-            komunikat << "Ilosc ludzi w kolejce OD KLIENTA " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
+            komunikat << "[Klient-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
+            komunikat << "[Klient-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
+            komunikat << "[Klient-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
 
             if(semop(sem_id, &operacjaP_ilosc_kas, 1) == -1) {
                 if( errno == EINTR ) {

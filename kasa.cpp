@@ -75,10 +75,10 @@ int main(int argc, char * argv[]) {
         if(!czy_kasa_otwarta) continue;
 
         stringstream paragon;
-        time_t t = time(0);
-        struct tm * timeinfo = localtime(&t);
+        struct tm timeinfo;
+        pobierz_aktualny_czas(&timeinfo);
         char bufor_czasu[80];
-        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", timeinfo);
+        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", &timeinfo);
 
         paragon << "\n";
         paragon << ".==================================." << "\n";

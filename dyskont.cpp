@@ -1,5 +1,4 @@
 #include <iostream>
-#include <chrono>
 
 #include "utils.h"
 
@@ -19,7 +18,7 @@ void usun_zombie(int) {
 }
 
 void wylacz_sklep(int) {
-    komunikat << "ZARZADAM ZAMKNIECIE SKLEPU\n";
+    komunikat << "[DYSKONT] ZARZADAM ZAMKNIECIE SKLEPU\n";
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmId_kasy, NULL, 0);
 
     DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
@@ -66,7 +65,7 @@ void wylacz_sklep(int) {
 int main() {
     srand(time(0) + getpid());
 
-    komunikat << "Pid dyskontu: " << getpid() << "\n";
+    komunikat << "[Dyskont] Pid dyskontu: " << getpid() << "\n";
 
     int ilosc_otwratych_kas = 0;
 
@@ -80,13 +79,12 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    
-    auto start = chrono::steady_clock::now();
-    auto end_simulation = start + chrono::seconds( (int) (simulation_time / simulation_speed) );
+    time_t dyskont_start = time(NULL);
+    time_t dyskont_koniec = dyskont_start + ((int) (simulation_time / simulation_speed));
 
     komunikat << "---------------------------------------" << "\n";
     komunikat << "---    Dyskont otwraty zapraszamy   ---" << "\n";
-    komunikat << "---------------------------------------" << "\n\n";
+    komunikat << "---------------------------------------" << "\n";
 
 	key_t key_sem = ftok(".", 'A');
     key_t key_kasy = ftok(".", 'B');
@@ -182,7 +180,7 @@ int main() {
         exit(1);
     }
 
-    komunikat << "[DYSKONT]" << "Obsluga wchodzi do sklepu" << "\n";
+    komunikat << "[DYSKONT] Obsluga wchodzi do sklepu" << "\n";
     int opid = checkError(fork(), "Blad utowrzenia forka");
     if (opid == 0) {
         checkError(
@@ -246,14 +244,14 @@ int main() {
     sleep(1);
 
     ListaKlientow * lista_klientow = new ListaKlientow(dane_klientow, 1);
-    while( chrono::steady_clock::now() < end_simulation && !ewakuacja) {
+    while( time(NULL) < dyskont_koniec && !ewakuacja) {
         while(dane_klientow->ilosc > MAX_ILOSC_KLIENTOW - 2 && dane_klientow->ilosc < MAX_ILOSC_KLIENTOW) {
             sleep(1);
         }
 
         sleep(randomTime(3 / simulation_speed));
 
-        if (chrono::steady_clock::now() >= end_simulation || ewakuacja) {
+        if (time(NULL) >= dyskont_koniec || ewakuacja) {
             break;
         }
 
@@ -290,7 +288,7 @@ int main() {
 
         // 5 10 15
         if(semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) < 5 * (ilosc_otwratych_kas - 3)) {
-            komunikat << "ZAMYKAM KASE " << "\n" << "\n";
+            komunikat << "[DYSKONT] ZAMYKAM KASE " << "\n" << "\n";
             for(int i=6;i> 0;i--) {
                 if(stan_dyskontu->status_kasy[i] == 1) {
                     Klient klient = {1, stan_dyskontu->pid_kasy[i], 0,0,-1,0};
@@ -325,17 +323,17 @@ int main() {
                 kill(stan_dyskontu->pid_kasy[wolny_status], SIGUSR1);
             }
         }
-        komunikat << "WARTOSC SEMAFORA: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
+        komunikat << "[DYSKONT] WARTOSC SEMAFORA: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
 
-        komunikat << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
-        komunikat << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
-        komunikat << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
+        komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
+        komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
+        komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
     }
 
     // czekanie az klienci opuszcza sklep
     while (semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
         if(ewakuacja) break;
-        komunikat << "Ilosc ludzi w kolejce IN SEM " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
+        komunikat << "[DYSKONT] Ilosc ludzi w kolejce IN SEM " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
         sleep(2);
     }
 
