@@ -26,6 +26,8 @@ int main(int argc, char * argv[]) {
         exit(1);
     }
 
+    utworz_grupe_semaforowa();
+
     int sem_id = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_samo = atoi(argv[3]);
@@ -34,9 +36,6 @@ int main(int argc, char * argv[]) {
     komunikat << "[KASA-" << getpid() << "]" << " Witam zapraszamy" << "\n";
 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL , 0);
-
-    struct sembuf operacjaP = {SEMAFOR_OBSLUGA, -1, SEM_UNDO};
-    struct sembuf operacjaV = {SEMAFOR_OBSLUGA, 1, SEM_UNDO};
 
     stringstream bufor;
     for(int i=0;i<8;i++) {
@@ -70,7 +69,7 @@ int main(int argc, char * argv[]) {
 
         komunikat << "[KASA-" << getpid() << "-" <<klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
         
-        sleep(randomTime(15));
+        sleep(randomTime(5));
         
         if(!czy_kasa_otwarta) continue;
 
@@ -94,27 +93,17 @@ int main(int argc, char * argv[]) {
         paragon << "| Towar                    Wartosc |" << "\n";
         paragon << "|                                  |" << "\n";
 
-        int aktualna_pozycja = 0, suma = 0 , transakcja_udana = 1;
+        int aktualna_pozycja = 0, suma = 0; 
         for(int i=0;i < klient.ilosc_produktow;i++) {
 
             if(!czy_kasa_otwarta) {
-                transakcja_udana = 0;
                 break; 
             }
 
             // 2% szans ze kasa utknie
             if(randomTimeWithRange(1, 100) > 98) {
 
-                if(semop(sem_id, &operacjaP, 1) == -1) {
-                    if(errno == EINTR || errno == EIDRM || errno == EINVAL) {
-                        paragon.clear();
-                        transakcja_udana = 0;
-                        break;
-                    } else{ 
-                        perror("Bledne opuszczenie semafor z OBSLUGI");
-                        exit(EXIT_FAILURE);
-                    }
-                }
+                operacja_p(sem_id, SEMAFOR_OBSLUGA);
 
                 komunikat << "[KASA-" << getpid() << "]" << " Waga towaru sie nie zgadza, prosze poczekac na obsluge \n";
                 Obsluga obsluga = {1, 2, getpid(), -1, -1};
@@ -125,39 +114,38 @@ int main(int argc, char * argv[]) {
                         "Blad wyslania komuniaktu to obslugi o sprawdzenie pelnoletnosci przez kase"
                     );
                 } else {
-                    transakcja_udana = 0;
-                    checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
+                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
                     break;
                 }
 
                 int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
 
-                if(rcvStatus == -1 || !czy_kasa_otwarta) {
-                    if(errno == EINTR) {
-                        transakcja_udana = 0;
-                        checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
+                if(!czy_kasa_otwarta) {
+                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                    break;
+                }
+
+                if(rcvStatus == -1) {
+                    if(errno == EINTR && !czy_kasa_otwarta) {
+                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
                         break;
+                    }
+                    if(errno == EINTR) {
+                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        continue;
                     } else {
                         perror("Blad odebrania wiadomosci od obslugi");
-                        exit(1);
+                        exit(EXIT_FAILURE);
                     }
                 }
 
-                checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
+                operacja_v(sem_id, SEMAFOR_OBSLUGA);
             }
 
             char * produkt = klient.lista_produktow + aktualna_pozycja;
             if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
-                    
-                if(semop(sem_id, &operacjaP, 1) == -1) {
-                    if(errno == EINTR || errno == EINVAL) {
-                        transakcja_udana = 0;
-                        break;
-                    } else{ 
-                        perror("Bledne opuszczenie semafor z OBSLUGI");
-                        exit(EXIT_FAILURE);
-                    }
-                }
+                
+                operacja_p(sem_id, SEMAFOR_OBSLUGA);
 
                 Obsluga obsluga = {1,1,getpid(), klient.wiek, -1};
                 if(czy_kasa_otwarta) {
@@ -166,21 +154,28 @@ int main(int argc, char * argv[]) {
                         "Blad wyslania komuniaktu to obslugi o sprawdzenie pelnoletnosci przez kase"
                     );
                 } else {
-                    transakcja_udana = 0;
-                    checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
+                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
                     break;
                 }
 
                 int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
 
-                if(rcvStatus == -1 || !czy_kasa_otwarta) {
-                    if(errno == EINTR || !czy_kasa_otwarta) {
-                        transakcja_udana = 0;
-                        checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
+                if(!czy_kasa_otwarta) {
+                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                    break;
+                }
+
+                if(rcvStatus == -1) {
+                    if(errno == EINTR && !czy_kasa_otwarta) {
+                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
                         break;
+                    }
+                    if(errno == EINTR) {
+                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        continue;
                     } else {
                         perror("Blad odebrania wiadomosci od obslugi");
-                        exit(1);
+                        exit(EXIT_FAILURE);
                     }
                 }
 
@@ -194,7 +189,7 @@ int main(int argc, char * argv[]) {
                     }
                 }
                 
-                checkError(semop(sem_id, &operacjaV, 1), "Bledne podniesie semafora od OBSLUGI");
+                operacja_v(sem_id, SEMAFOR_OBSLUGA);
             } else {
                 int cena = wyswietl_cene_produktu(produkt);
                 suma += cena;
@@ -207,7 +202,7 @@ int main(int argc, char * argv[]) {
             aktualna_pozycja += strlen(produkt) + 1;
         }
 
-        if(!czy_kasa_otwarta || !transakcja_udana) {
+        if(!czy_kasa_otwarta) {
             paragon.str("");
             paragon.clear();
             continue;

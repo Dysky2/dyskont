@@ -11,6 +11,8 @@ void opusc_sklep(int) {
 }
 
 int main(int, char * argv[]) {
+    utworz_grupe_semaforowa();
+
     komunikat << "[OBSLUGA] " << "Witam " << "\n";
 
     signal(SIGTERM, opusc_sklep);
@@ -26,11 +28,13 @@ int main(int, char * argv[]) {
             exit(0);
         }
 
+        if( !czy_obsluguje ) {
+            break;
+        }
+
         if(rcvStatus == -1) {
-            if (errno == EINTR) {
-                break;
-            } else if(errno == EIDRM || errno == EINVAL) {
-                break;
+            if (errno == EINTR && czy_obsluguje) {
+                continue;
             } else {
                 perror("Blad podczas odbierania komuniaktu z kolejki");
                 exit(EXIT_FAILURE);
@@ -40,11 +44,11 @@ int main(int, char * argv[]) {
         if(obsluga.powod == 1) {
             // Czas az obsluga podejdzie do kasy
             sleep(6);
-            if(!czy_obsluguje) {
-                komunikat << "[OBSLUGA] " << "Koncze prace " << "\n";
-                exit(0);
-            }
 
+            if(!czy_obsluguje) {
+                break;
+            }
+            
             if(obsluga.wiek_klienta >= 18) {
                 obsluga.pelnoletni = 0;
                 komunikat << "[OBSLUGA] " << "Klient jest pelnoletni, moze kupic alkohol, przy kasie: " << obsluga.kasa_id << "\n";
@@ -55,18 +59,21 @@ int main(int, char * argv[]) {
         } else if(obsluga.powod == 2) {
             // Czas az obsługa poprawi kase
             sleep(6);  
-            
+
             if(!czy_obsluguje) {
-                komunikat << "[OBSLUGA] " << "Koncze prace " << "\n";
-                exit(0);
+                break;
             }
+
             komunikat << "[OBSLUGA] " << "Waga przy kasie " << obsluga.kasa_id << " zostala naprawiona\n";
         }
 
+        if(!czy_obsluguje) {
+            break;
+        }
 
         obsluga.mtype = obsluga.kasa_id;
         if(kill(obsluga.kasa_id, 0) == 0) {
-            msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0);
+            checkError(msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0), "Bledne wyslanie wiadomosci od obslugi do klienta");
         }
     }
 

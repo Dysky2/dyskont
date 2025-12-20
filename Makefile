@@ -1,24 +1,13 @@
 CFLAGS ?= -Wall -Wextra -O2
 
-all: dyskont klient kasa kasjer obsluga kierownik
+TARGETS = dyskont klient kasa kasjer obsluga kierownik
 
-dyskont: dyskont.cpp utils.h
-	g++ $(CFLAGS) dyskont.cpp -o dyskont
+UTILS_SRC = utils.cpp
 
-klient: klient.cpp utils.h
-	g++ $(CFLAGS) klient.cpp -o klient
+all: $(TARGETS)
 
-kasa: kasa.cpp utils.h
-	g++ $(CFLAGS) kasa.cpp -o kasa
-
-kasjer: kasjer.cpp utils.h
-	g++ $(CFLAGS) kasjer.cpp -o kasjer
-
-obsluga: obsluga.cpp utils.h
-	g++ $(CFLAGS) obsluga.cpp -o obsluga
-
-kierownik: kierownik.cpp utils.h
-	g++ $(CFLAGS) kierownik.cpp -o kierownik
+$(TARGETS): %: %.cpp $(UTILS_SRC)
+	g++ $(CFLAGS) $^ -o $@
 
 clean:
-	rm -f dyskont klient kasa kasjer obsluga kierownik *.o
+	rm -f $(TARGETS) *.o

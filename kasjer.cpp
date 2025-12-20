@@ -28,12 +28,13 @@ void otworz_kase_stac2(int) {
 }
 
 int main(int, char * argv[]) {
+    utworz_grupe_semaforowa();
+
     komunikat << "Otwieram kase stacjonarna " << getpid() << "\n";
 
     signal(SIGALRM, wstrzymaj_kase);
     signal(SIGUSR1, otworz_kase_stac2);
     signal(SIGUSR2, przerwij_prace);
-    // signal(SIGCONT, zacznij_prace);
     signal(SIGTERM, zamknij_kase);
 
     int sem_id = atoi(argv[1]);
@@ -49,10 +50,9 @@ int main(int, char * argv[]) {
         int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
 
         if(stan_dyskontu->status_kasy[nr_kasy] == 0) {
-            if(pobierz_ilosc_wiadomosci(id_kasy) <= 0) {
-                alarm(2);
+            if(pobierz_ilosc_wiadomosci(id_kasy) < 0) {
+            } else {
                 pause();
-                alarm(0);
                 continue;
             }
         } 
@@ -85,7 +85,7 @@ int main(int, char * argv[]) {
 
         komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
 
-        sleep(randomTime(15));
+        sleep(randomTime(5));
 
         if(!czy_kasa_otwarta) continue;
         
@@ -161,7 +161,7 @@ int main(int, char * argv[]) {
         paragon << "| ||| || ||| | ||| || || ||| | ||| |\n";
         paragon << "| ||| || ||| | ||| || || ||| | ||| |\n";
         paragon << "| ||| || ||| | ||| || || ||| | ||| |\n";
-        paragon << "|    0023    " << left << setw(4) << klient.klient_id << "      9912       |\n";
+        paragon << "|    0023    " << left << setw(10) << klient.klient_id << "    9912    |\n";
         paragon << "|                                  |\n";
         paragon << "| DZIEKUJEMY I ZAPRASZAMY PONOWNIE |\n";
         paragon << "'=================================='" << "\n"; 

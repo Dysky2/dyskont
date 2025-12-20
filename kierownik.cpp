@@ -11,8 +11,16 @@ void zamknij_kierownika(int) {
 }
 void kontynuj_prace(int) {}
 
-int main(int, char * argv[]) {
-    komunikat << "Kierownik wchodzi do dyskontu\n";
+int main(int argc, char * argv[]) {
+
+    if (argc < 5) {
+        perror("Uzyto za malo argumentow w kierowniku");
+        exit(EXIT_FAILURE);
+    }
+
+    utworz_grupe_semaforowa();
+
+    komunikat << "[Kierownik] wchodzi do dyskontu\n";
 
     struct sigaction sa_term;
     memset(&sa_term, 0, sizeof(struct sigaction));
@@ -63,55 +71,59 @@ int main(int, char * argv[]) {
             if(czy_kierownik_ma_dzialac == 0) {
                 break;
             }
-            cin.ignore(32767, '\n');
             cin.clear();
+            cin.ignore(1000, '\n');
             continue;
         }
 
         int kasa = 0;
         switch (option) {
             case 1:
-                if(stan_dyskontu->status_kasy[7] == 0) {
-                    // TODO podniesie semafora z liczba_kas
-                    komunikat << "Zarzadam otwarcie kasy stacjonarnej 2";
-                    kill(stan_dyskontu->pid_kasy[7], SIGUSR1);
+                if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 0) {
+                    operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
+                    komunikat << "Zarzadam otwarcie kasy stacjonarnej 2\n";
+                    kill(stan_dyskontu->pid_kasy[ID_KASY_STACJONARNEJ_2], SIGUSR1);
                 } else {
                     komunikat << "Ta kasa jest juz otwarta\n";
                 }
                 break;
             case 2:
                 komunikat << "Wybierz kase 1 lub 2: \n";
-                cin >> kasa;
+                if (!(cin >> kasa)) {
+                    cin.clear();
+                    cin.ignore(1000, '\n');
+                    komunikat << "Musisz podac liczbe!\n";
+                    break; 
+                }
                 if(kasa == 1) {
-                    if(stan_dyskontu->status_kasy[6] == 1) {
-                        // TODO opusczenie semafora LICZA_KAS
+                    if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] == 1) {
 
-                        while ( pobierz_ilosc_wiadomosci(msqid_kolejka_stac1) > 0) {
-                            komunikat << "Nie moge zamknac kasy poniewaz, ludzie staoja dalej w kolejce\n";
-                            stan_dyskontu->status_kasy[6] = 2;
+                        komunikat << "Zarzadzam zamkniecie kasy 1\n";
+                        stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 2;
 
+                        while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac1) > 0 || stan_dyskontu->dlugosc_kolejki[1] > 0) {
+                            komunikat << "Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
                             sleep(2);
                         }
 
-                        struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
-                        semop(sem_id, &operacjaP, 1);
-                        stan_dyskontu->status_kasy[6] = 0;
+                        operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
+                        stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 0;
+                        break;
                     } else {
                         komunikat << "Kasa jest juz zamknieta\n";
                     }
                 } else if(kasa == 2) {
-                    if(stan_dyskontu->status_kasy[7] == 1) {
-
-                        while ( pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0) {
-                            komunikat << "Nie moge zamknac kasy poniewaz, ludzie staoja dalej w kolejce\n";
-                            stan_dyskontu->status_kasy[7] = 2;
-
+                    if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 1) {
+                        
+                        stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] = 2;
+                        while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0  || stan_dyskontu->dlugosc_kolejki[2] > 0) {
+                            komunikat << "Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
                             sleep(2);
                         }
 
-                        struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
-                        semop(sem_id, &operacjaP, 1);
-                        stan_dyskontu->status_kasy[7] = 0;
+                        operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
+                        stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] = 0;
+                        break;
                     }else {
                         komunikat << "Kasa jest juz zamknieta\n";
                     }
@@ -121,8 +133,8 @@ int main(int, char * argv[]) {
                 break;
             case 3:
                 komunikat << "Kierownik zarzadzil zamkniecie sklepu\n";
-                show_panel = 0;
                 kill(stan_dyskontu->pid_dyskontu, SIGTERM);
+                czy_kierownik_ma_dzialac = 0;
                 break;
             case 4:
                 komunikat << "Kierownik opusza dyskont\n";
@@ -130,10 +142,15 @@ int main(int, char * argv[]) {
                 break;
             default:
                 komunikat << "Wywolano zla opcje\n";
+                cin.clear();
                 break;
         }
     }
 
     komunikat << "Kierownik opusza dyskont \n";
+    if(shmdt(stan_dyskontu) == -1) {
+        perror("Bledne odlaczenie pamieci");
+        exit(EXIT_FAILURE);
+    }
     exit(0);
 }
