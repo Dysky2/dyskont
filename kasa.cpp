@@ -32,6 +32,9 @@ int main(int argc, char * argv[]) {
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_samo = atoi(argv[3]);
     int msqid_kolejka_obsluga = atoi(argv[4]);
+    string nazwa_katalogu = argv[5];
+
+    ustaw_nazwe_katalogu(nazwa_katalogu);
 
     komunikat << "[KASA-" << getpid() << "]" << " Witam zapraszamy" << "\n";
 
@@ -93,7 +96,7 @@ int main(int argc, char * argv[]) {
         paragon << "| Towar                    Wartosc |" << "\n";
         paragon << "|                                  |" << "\n";
 
-        int aktualna_pozycja = 0, suma = 0; 
+        int aktualna_pozycja = 0, suma = 0, czy_klient_zostal_sprawdzony = 0, czy_jest_pelnoletni = 0;
         for(int i=0;i < klient.ilosc_produktow;i++) {
 
             if(!czy_kasa_otwarta) {
@@ -109,10 +112,20 @@ int main(int argc, char * argv[]) {
                 Obsluga obsluga = {1, 2, getpid(), -1, -1};
 
                 if(czy_kasa_otwarta) {
-                    checkError( 
-                        msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0),
-                        "Blad wyslania komuniaktu to obslugi o sprawdzenie pelnoletnosci przez kase"
-                    );
+                    int send_status = msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0);
+
+                    if(send_status == -1) {
+                        if (errno == EINTR) {
+                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            i--;
+                            continue;
+                        } else {
+                            perror("Blad msgsnd waga");
+                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+
                 } else {
                     operacja_v(sem_id, SEMAFOR_OBSLUGA);
                     break;
@@ -132,6 +145,7 @@ int main(int argc, char * argv[]) {
                     }
                     if(errno == EINTR) {
                         operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        i--;
                         continue;
                     } else {
                         perror("Blad odebrania wiadomosci od obslugi");
@@ -143,43 +157,67 @@ int main(int argc, char * argv[]) {
             }
 
             char * produkt = klient.lista_produktow + aktualna_pozycja;
-            if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
-                
-                operacja_p(sem_id, SEMAFOR_OBSLUGA);
 
-                Obsluga obsluga = {1,1,getpid(), klient.wiek, -1};
-                if(czy_kasa_otwarta) {
-                    checkError( 
-                        msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0),
-                        "Blad wyslania komuniaktu to obslugi o sprawdzenie pelnoletnosci przez kase"
-                    );
-                } else {
-                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
-                    break;
-                }
 
-                int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
+            if(!czy_klient_zostal_sprawdzony) {
+                if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
+                    
+                    operacja_p(sem_id, SEMAFOR_OBSLUGA);
 
-                if(!czy_kasa_otwarta) {
-                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
-                    break;
-                }
+                    Obsluga obsluga = {1,1,getpid(), klient.wiek, -1};
+                    if(czy_kasa_otwarta) {
+                        int send_status = msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 0);
 
-                if(rcvStatus == -1) {
-                    if(errno == EINTR && !czy_kasa_otwarta) {
+                        if(send_status == -1) {
+                            if (errno == EINTR) {
+                                operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                                i--;
+                                continue;
+                            } else {
+                                perror("Blad msgsnd waga");
+                                operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                                exit(EXIT_FAILURE);
+                            }
+                        }
+                    } else {
                         operacja_v(sem_id, SEMAFOR_OBSLUGA);
                         break;
                     }
-                    if(errno == EINTR) {
-                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
-                        continue;
-                    } else {
-                        perror("Blad odebrania wiadomosci od obslugi");
-                        exit(EXIT_FAILURE);
-                    }
-                }
 
-                if(obsluga.pelnoletni == 0) {
+                    int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
+
+                    if(!czy_kasa_otwarta) {
+                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        break;
+                    }
+
+                    if(rcvStatus == -1) {
+                        if(errno == EINTR && !czy_kasa_otwarta) {
+                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            break;
+                        }
+                        if(errno == EINTR) {
+                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            i--;
+                            continue;
+                        } else {
+                            perror("Blad odebrania wiadomosci od obslugi");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+
+                    czy_klient_zostal_sprawdzony = 1;
+
+                    if(obsluga.pelnoletni) {
+                        czy_jest_pelnoletni = 1;
+                    }
+                    
+                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                } 
+            }
+
+            if(strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0) {
+                if(czy_jest_pelnoletni) {
                     int cena = wyswietl_cene_produktu(produkt);
                     suma += cena;
                     paragon << "| " << left << setw(21) << produkt 
@@ -187,9 +225,9 @@ int main(int argc, char * argv[]) {
                     if (i < klient.ilosc_produktow - 1) {
                         paragon << "\n";
                     }
+                } else {
+                    komunikat << "[KASA-" << getpid() << "] " << "Produkt wycofany: " << produkt << "\n";
                 }
-                
-                operacja_v(sem_id, SEMAFOR_OBSLUGA);
             } else {
                 int cena = wyswietl_cene_produktu(produkt);
                 suma += cena;
@@ -199,6 +237,7 @@ int main(int argc, char * argv[]) {
                     paragon << "\n";
                 }
             }
+
             aktualna_pozycja += strlen(produkt) + 1;
         }
 
@@ -247,7 +286,7 @@ int main(int argc, char * argv[]) {
             msgsnd(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 0);
         }
     }
-
+    
     komunikat << "[KASA-" << getpid() << "]" << " Koniec" << "\n";
     exit(0);
 }

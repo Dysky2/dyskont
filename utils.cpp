@@ -3,12 +3,13 @@
 // -- ZMIENNE GLOBALNE -- 
 
 const double simulation_speed = 1.0;
-const int simulation_time = 30;
+const int simulation_time = 10;
 const int startowa_ilosc_kas = 3;
 
 // -- ZMIENNNE LOKALNE --
 
 int sem_id = -1;
+std::string nazwa_katalogu;
 
 // -- Funkcje globalne --
 
@@ -91,6 +92,32 @@ void operacja_v(int semId, int semNum) {
     }
 }
 
+std::string utworz_katalog_na_logi() {
+    char bufor_data[64];
+
+    struct tm czas;
+    pobierz_aktualny_czas(&czas);
+
+    strftime(bufor_data, 64, "./Logi/%Y%m%d-%H%M%S", &czas);
+
+    int status_katalogu = mkdir(bufor_data, 0700);
+
+    if(status_katalogu == -1) {
+        if(errno == EEXIST) {
+            perror("Katalog juz istnieje");
+        } else {
+            perror("Nie mozna utworzyc katalogu");
+        }
+    }
+
+    nazwa_katalogu = bufor_data;
+    return bufor_data;
+}
+
+void ustaw_nazwe_katalogu(std::string nazwa) {
+    nazwa_katalogu = nazwa;
+}
+
 // -- STRUKTURY --
 
 AtomicLogger::AtomicLogger() {
@@ -101,15 +128,48 @@ AtomicLogger::AtomicLogger() {
 
 AtomicLogger::~AtomicLogger() {
     // bufor << "\n";
+    std::string nazwa_pliku;
+    int nazwa_sie_zgadza = 0;
+    std::string str_bufor = bufor.str();
 
-    struct sembuf operacjaP = {SEMAFOR_OUTPUT, -1, SEM_UNDO};
-    if(semop(sem_id, &operacjaP, 1) == 0) {
-        std::string tresc = bufor.str();
-        int status = write(1, tresc.c_str(), tresc.length());
-        if(status == -1) {
-            perror("Blad zapisu write");
+    for(auto c : str_bufor) {
+        if(c == '[') {
+            nazwa_sie_zgadza = 1;
+            continue;
+        }
+        
+        if(nazwa_sie_zgadza) {
+            if(c == ']' || c == '-') {
+                break;
+            }
+            nazwa_pliku += tolower(c);
+        }
+    }
+
+    int fd = -1;
+    if(nazwa_pliku.length() > 0) {
+        std::string sciezka = nazwa_katalogu + "/" + nazwa_pliku + ".log";
+        fd = open(sciezka.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0600);
+        checkError(fd, "Bledne otawrce pliku ");
+    }
+    
+    operacja_p(sem_id, SEMAFOR_OUTPUT);
+    std::string tresc = bufor.str();
+    if(fd != -1 && nazwa_pliku.length() > 0) {
+        int file_status = write(fd, tresc.c_str(), tresc.length());
+        if(file_status == -1) {
+            operacja_v(sem_id, SEMAFOR_OUTPUT);
+            perror("Blad zapisu write do pliku");
+            close(fd);
             exit(EXIT_FAILURE);
         }
+        close(fd);
+    }
+    int status = write(1, tresc.c_str(), tresc.length());
+    if(status == -1) {
+        operacja_v(sem_id, SEMAFOR_OUTPUT);
+        perror("Blad zapisu write");
+        exit(EXIT_FAILURE);
     }
 
     operacja_v(sem_id, SEMAFOR_OUTPUT);
@@ -246,7 +306,6 @@ int Kolejka::czy_oplaca_sie_zmienic_kolejke(int pid_klienta, int aktualny_nr_kol
 
     if(aktualny_nr_kolejki == 0) {
         for(int i=6 ; i < 8; i++) {
-
             int nr_koleki = i == 6 ? 1 : 2;
 
             czas_kolejki_do_ktorej_chce_przejsc = stan_dyskontu->sredni_czas_obslugi[nr_koleki] * stan_dyskontu->dlugosc_kolejki[nr_koleki];

@@ -117,10 +117,12 @@ int main() {
     time_t dyskont_start = time(NULL);
     time_t dyskont_koniec = dyskont_start + ((int) (simulation_time / simulation_speed));
 
+    string nazwa_katalogu = utworz_katalog_na_logi();
+
     komunikat << "[Dyskont] Pid dyskontu: " << getpid() << "\n";
-    komunikat << "---------------------------------------" << "\n";
-    komunikat << "---    Dyskont otwraty zapraszamy   ---" << "\n";
-    komunikat << "---------------------------------------" << "\n";
+    komunikat << "[Dyskont] ---------------------------------------" << "\n";
+    komunikat << "[Dyskont] ---    Dyskont otwraty zapraszamy   ---" << "\n";
+    komunikat << "[Dyskont] ---------------------------------------" << "\n";
 
     int kierownik_pid = checkError(fork(), "Blad utowrzenia forka");
     if (kierownik_pid == 0) {
@@ -134,7 +136,8 @@ int main() {
                             to_string(shmId_kasy) + " " + 
                             to_string(dyskont_sem_id) + " " + 
                             to_string(msqid_kolejka_stac1) + " " + 
-                            to_string(msqid_kolejka_stac2) +  "; exec bash";
+                            to_string(msqid_kolejka_stac2) + " " +
+                            nazwa_katalogu + "; exec bash";
         
         execlp("cmd.exe", 
             "cmd.exe",
@@ -162,6 +165,7 @@ int main() {
                 "./obsluga", 
                 "obsluga",
                 to_string(msqid_kolejka_obsluga).c_str(),
+                nazwa_katalogu.c_str(),
                 NULL
             ),
             "Blad wywolania execa"
@@ -181,6 +185,7 @@ int main() {
                         to_string(shmId_kasy).c_str(), 
                         to_string(msqid_kolejka_samo).c_str(),
                         to_string(msqid_kolejka_obsluga).c_str(),
+                        nazwa_katalogu.c_str(),
                         NULL
                     ),
                     "Blad wywolania execa"
@@ -205,6 +210,7 @@ int main() {
                         to_string(shmId_kasy).c_str(), 
                         to_string(msqid_kolejka_stac1).c_str(), 
                         to_string(msqid_kolejka_stac2).c_str(),
+                        nazwa_katalogu.c_str(),
                         NULL
                     ),
                     "Blad wywolania execa"
@@ -239,6 +245,7 @@ int main() {
                     to_string(msqid_kolejka_stac1).c_str(),
                     to_string(msqid_kolejka_stac2).c_str(),
                     to_string(shm_id_klienci).c_str(),
+                    nazwa_katalogu.c_str(),
                     NULL
                 ), 
                 "Blad exec" 
@@ -295,7 +302,13 @@ int main() {
                 kill(stan_dyskontu->pid_kasy[wolny_status], SIGUSR1);
             }
         }
-        komunikat << "[DYSKONT] WARTOSC SEMAFORA: " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
+        stringstream semafory;
+        semafory << "[DYSKONT] Semafory: ";
+        for(int i=0;i<8;i++) {
+            semafory << semctl(dyskont_sem_id, i, GETVAL) << " ";
+        }
+        komunikat << semafory.str() << "\n";
+        semafory.clear();
 
         komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
         komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
@@ -304,7 +317,14 @@ int main() {
 
     // czekanie az klienci opuszcza sklep
     while (semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
-        if(ewakuacja) break;
+        stringstream semafory;
+        semafory << "[DYSKONT] Semafory: ";
+        for(int i=0;i<8;i++) {
+            semafory << semctl(dyskont_sem_id, i, GETVAL) << " ";
+        }
+        komunikat << semafory.str() << "\n";
+        semafory.clear();
+        
         komunikat << "[DYSKONT] Ilosc ludzi w kolejce IN SEM " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
         sleep(2);
     }

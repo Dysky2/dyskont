@@ -13,11 +13,15 @@ void opusc_sklep(int) {
 int main(int, char * argv[]) {
     utworz_grupe_semaforowa();
 
+    signal(SIGTERM, opusc_sklep);
+    
+    int msqid_kolejka_obsluga = atoi(argv[1]);
+    string nazwa_katalogu = argv[2];
+    
+    ustaw_nazwe_katalogu(nazwa_katalogu);
+    
     komunikat << "[OBSLUGA] " << "Witam " << "\n";
 
-    signal(SIGTERM, opusc_sklep);
-
-    int msqid_kolejka_obsluga = atoi(argv[1]);
 
     while(czy_obsluguje) {
         Obsluga obsluga;
@@ -50,10 +54,10 @@ int main(int, char * argv[]) {
             }
             
             if(obsluga.wiek_klienta >= 18) {
-                obsluga.pelnoletni = 0;
+                obsluga.pelnoletni = 1;
                 komunikat << "[OBSLUGA] " << "Klient jest pelnoletni, moze kupic alkohol, przy kasie: " << obsluga.kasa_id << "\n";
             } else {
-                obsluga.pelnoletni = -1;
+                obsluga.pelnoletni = 0;
                 komunikat << "[OBSLUGA] " << "Klient nie jest pelnoletni, alkohol zostanie odlozony, przy kasie: " << obsluga.kasa_id  << "\n";
             }
         } else if(obsluga.powod == 2) {

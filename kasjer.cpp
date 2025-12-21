@@ -30,17 +30,20 @@ void otworz_kase_stac2(int) {
 int main(int, char * argv[]) {
     utworz_grupe_semaforowa();
 
-    komunikat << "Otwieram kase stacjonarna " << getpid() << "\n";
-
     signal(SIGALRM, wstrzymaj_kase);
     signal(SIGUSR1, otworz_kase_stac2);
     signal(SIGUSR2, przerwij_prace);
     signal(SIGTERM, zamknij_kase);
-
+    
     int sem_id = atoi(argv[1]);
     shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_stac1 = atoi(argv[3]);
     int msqid_kolejka_stac2 = atoi(argv[4]);
+    string nazwa_katalogu = argv[5];
+    
+    ustaw_nazwe_katalogu(nazwa_katalogu);
+    
+    komunikat << "[KASJER-" << getpid() << "] " << "Otwieram kase stacjonarna " << "\n";
 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
 
@@ -61,7 +64,7 @@ int main(int, char * argv[]) {
         memset(&klient, 0, sizeof(Klient));
 
         // Po ilu ma sie kasa wylaczyc -- domyslnie 30
-        alarm(10);  
+        alarm(30);  
         int status = msgrcv(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 1, MSG_NOERROR);
         alarm(0);
 
@@ -75,7 +78,7 @@ int main(int, char * argv[]) {
             }
             if(errno == EIDRM || errno == EINVAL) break;
             if(errno == EINTR) {
-                komunikat << "[Kasjer-" << getpid() << "] " << "Zamykam kase gdzy nie pojawil sie zaden klient: "<< "\n";
+                komunikat << "[KASJER-" << getpid() << "] " << "Zamykam kase gdzy nie pojawil sie zaden klient: "<< "\n";
                 struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
                 semop(sem_id, &operacjaP, 1);
                 stan_dyskontu->status_kasy[nr_kasy] = 0;
@@ -172,11 +175,11 @@ int main(int, char * argv[]) {
             msgsnd(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 0);
         }
 
-        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
-        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
-        komunikat << "Ilosc ludzi w kolejce OD KASJERA " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
+        komunikat << "[KASJER-" << getpid() << "] " <<  "Ilosc ludzi w kolejce: " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
+        komunikat << "[KASJER-" << getpid() << "] " <<  "Ilosc ludzi w kolejce: " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
+        komunikat << "[KASJER-" << getpid() << "] " <<  "Ilosc ludzi w kolejce: " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
     }
 
-    komunikat  << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n";
+    komunikat << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n";
     exit(0);
 }

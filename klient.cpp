@@ -56,7 +56,10 @@ int main(int, char * argv[]) {
     int msqid_kolejka_stac1 = atoi(argv[4]);
     int msqid_kolejka_stac2 = atoi(argv[5]);
     int shm_id_klienci = atoi(argv[6]);
+    string nazwa_katalogu = argv[7];
     
+    ustaw_nazwe_katalogu(nazwa_katalogu);
+
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
     DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
 
@@ -105,7 +108,7 @@ int main(int, char * argv[]) {
         kolejka->dodaj_do_kolejki(getpid(), aktualnyNr);
         operacja_v(sem_id, aktualnyNr);
 
-        komunikat << "[" << "Klient-" << getpid() << "] " << "Staje do kasy " << aktualnyNr << "\n";
+        komunikat << "[" << "KLIENT-" << getpid() << "] " << "Staje do kasy " << aktualnyNr << "\n";
     }
 
     time_t czas_startu = time(NULL);
@@ -116,9 +119,9 @@ int main(int, char * argv[]) {
         operacja_v(sem_id, aktualnyNr);
 
         if(czy_jestem_pierwszy) {
-            komunikat << "[Klient-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
-            komunikat << "[Klient-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
-            komunikat << "[Klient-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
+            komunikat << "[KLIENT-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
+            komunikat << "[KLIENT-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
+            komunikat << "[KLIENT-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
 
             operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
 
@@ -199,7 +202,7 @@ int main(int, char * argv[]) {
                 }
 
                 if(czy_mozna_sie_przeniesc) {
-                    komunikat << "[" << "Klient-" << getpid() << "] " << "Zmienia kase z " << aktualnyNr << " do " << nr_kolejki_do_zmiany << "\n";
+                    komunikat << "[" << "KLIENT-" << getpid() << "] " << "Zmienia kase z " << aktualnyNr << " do " << nr_kolejki_do_zmiany << "\n";
 
                     operacja_p(sem_id, aktualnyNr);
                     kolejka->usun_z_kolejki(getpid(), aktualnyNr);

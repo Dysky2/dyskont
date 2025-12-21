@@ -14,6 +14,8 @@
 #include <cstring>
 #include <iomanip>
 #include <time.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <limits.h>
 
 // -- DEFINICJE MAKSYMALNYCH WARTOSCI --
@@ -82,7 +84,9 @@ void operacja_p(int semId, int semNum);
 // Podniesienie danego semafora o 1
 void operacja_v(int semId, int semNum);
 
+std::string utworz_katalog_na_logi();
 
+void ustaw_nazwe_katalogu(std::string nazwa);
 
 // -- STRUKTURY --
 
@@ -103,7 +107,7 @@ struct Obsluga {
     int powod; // 1 -> Sprawdzenie wieku, 2 -> popsuta kasa
     int kasa_id;
     int wiek_klienta;
-    int pelnoletni; // -1 -> osobo niepelnetnia 0 -> pelnoletni
+    int pelnoletni; // 0 -> osobo niepelnetnia 1 -> pelnoletni
 };
 
 struct Klient {
