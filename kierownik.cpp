@@ -123,20 +123,17 @@ int main(int argc, char * argv[]) {
                 czy_kierownik_ma_dzialac = 0;
                 break;
             case 4:
-                komunikat << "[Kierownik] opusza dyskont\n";
-                exit(0);
+                czy_kierownik_ma_dzialac = 0;
                 break;
             default:
                 komunikat << "[Kierownik] Wywolano zla opcje\n";
                 cin.clear();
+                cin.ignore(1000, '\n');
                 break;
         }
     }
 
     komunikat << "[Kierownik] opusza dyskont \n";
-    if(shmdt(stan_dyskontu) == -1) {
-        perror("[Kierownik] Bledne odlaczenie pamieci");
-        exit(EXIT_FAILURE);
-    }
+    checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu" );
     exit(0);
 }

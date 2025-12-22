@@ -77,16 +77,26 @@ int main() {
     dyskont_sem_id = utworz_grupe_semaforowa();
     ustaw_poczatkowe_wartosci_semaforow(dyskont_sem_id);
     
-    // Tworze pamiec dzielona dla stanu calego dyskontu
+    // Tworze pamiec dzielona dla listy klientow w dyskoncie
     shm_id_klienci = checkError( shmget(utworz_klucz('B'), sizeof(DaneListyKlientow), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej dla klientow" );
 
     DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
 
-    //Tworze pamiec dzielona dla kas
+    if(dane_klientow == (void*) -1) {
+        perror("[DYSKONT] Bledne podlaczenie pamieci dzielonej klientow w dyskoncie");
+        exit(EXIT_FAILURE);
+    }
+    
+    // Tworze pamiec dzielona dla stanu calego dyskontu
     shmId_kasy = checkError( shmget(utworz_klucz('C'), sizeof(StanDyskontu), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej");
 
     // Ustawienie wartosci semafora odrazu na ilosc_kas_startowych 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmId_kasy, NULL, 0);
+
+    if(stan_dyskontu == (void*) -1) {
+        perror("[DYSKONT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
+        exit(EXIT_FAILURE);
+    }
     stan_dyskontu->sredni_czas_obslugi[0] = CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA;
     stan_dyskontu->sredni_czas_obslugi[1] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
     stan_dyskontu->sredni_czas_obslugi[2] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
@@ -254,14 +264,12 @@ int main() {
             operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
             lista_klientow->dodaj_klienta_do_listy(id);
             operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-
         }
 
         // otwarcie kasy stacjonarnej 1
         if(stan_dyskontu->dlugosc_kolejki[0] > 3 && stan_dyskontu->status_kasy[6] == 0) {
             stan_dyskontu->status_kasy[6] = 1;
-            struct sembuf operacjaV = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
-            semop(dyskont_sem_id, &operacjaV, 1);
+            operacja_v(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
             kill(stan_dyskontu->pid_kasy[6], SIGUSR2);
         }
 
@@ -272,13 +280,11 @@ int main() {
                 if(stan_dyskontu->status_kasy[i] == 1) {
                     Klient klient = {1, stan_dyskontu->pid_kasy[i], 0,0,-1,0};
                     stan_dyskontu->status_kasy[i]=0;
-                    stan_dyskontu->pid_kasy[i]=0;
 
-                    struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
-                    if(semop(dyskont_sem_id, &operacjaP, 1) == 0) {
-                        msgsnd(msqid_kolejka_samo, &klient, sizeof(klient)-sizeof(long), 0);
-                        ilosc_otwratych_kas--;
-                    }
+                    operacja_p(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
+                    msgsnd(msqid_kolejka_samo, &klient, sizeof(klient)-sizeof(long), 0);
+                    ilosc_otwratych_kas--;
+                    
                     break;
                 }
             }
@@ -297,8 +303,7 @@ int main() {
             if(wolny_status != -1) {
                 ilosc_otwratych_kas++;
                 stan_dyskontu->status_kasy[wolny_status] = 1;
-                struct sembuf operacjaV = {SEMAFOR_ILOSC_KAS, 1, SEM_UNDO};
-                semop(dyskont_sem_id, &operacjaV, 1);
+                operacja_v(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
                 kill(stan_dyskontu->pid_kasy[wolny_status], SIGUSR1);
             }
         }
@@ -332,17 +337,36 @@ int main() {
     if(!ewakuacja) {
 
         // Zakonczenie działania obłsugi
-        Obsluga obsluga = {1, -1, -1, 0, 0};
-        checkError( msgsnd(msqid_kolejka_obsluga, &obsluga, sizeof(obsluga) - sizeof(long int), 0), "Blad zamkniecia oblsugi" );
+        if(obsluga_id > 0) {
+            int kill_status_obsluga = kill(obsluga_id, SIGTERM);
+            if(kill_status_obsluga == -1) {
+                if(errno != ESRCH) {
+                    perror("Blad wyslania SIGTERM do obslugi");
+                }
+            }
+        }
         
         // Wyslanie wiadomosci o zamkniecie kas
         komunikat << "[DYSKONT]" << "WYLACZENIE KAS" << "\n";
         for(int i=0; i < 8;i++) {
-            kill(stan_dyskontu->pid_kasy[i], SIGTERM);
+            int wynik = kill(stan_dyskontu->pid_kasy[i], SIGTERM);
+
+            if(wynik == -1) {
+                if(errno != ESRCH) {
+                    perror("Blad wyslania SIGTERM do obslugi");
+                }
+            }
         }
     }
 
-    kill(stan_dyskontu->pid_kierownika, SIGTERM);
+    if(stan_dyskontu->pid_kierownika > 0) {
+        int kill_status_kierownik = kill(stan_dyskontu->pid_kierownika, SIGTERM);
+        if(kill_status_kierownik == -1) {
+            if(errno != ESRCH) {
+                perror("Blad wyslania SIGTERM do obslugi");
+            }
+        }
+    }
 
     // Czekam az wszyscy klienci zakoncza zakupy
     while (wait(NULL) > 0) {}
@@ -351,6 +375,9 @@ int main() {
         checkError(-1, "Blad czekania na klientow");
     }
 
+    checkError( shmdt(dane_klientow), "Blad odlaczenia pamieci klientow" );
+    checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu" );
+
     checkError( semctl(dyskont_sem_id, 0, IPC_RMID), "Blad zamknieca semfora");
     checkError( shmctl(shmId_kasy, IPC_RMID, NULL), "Blad zamkniecia pamieci dzielonj");
     checkError( shmctl(shm_id_klienci, IPC_RMID, NULL), "Blad zamkniecia pamieci dzielonj");
@@ -358,5 +385,7 @@ int main() {
     checkError( msgctl(msqid_kolejka_stac1, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_1" );
     checkError( msgctl(msqid_kolejka_stac2, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
     checkError( msgctl(msqid_kolejka_obsluga, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
+
+    delete lista_klientow;
     return 0;
 }

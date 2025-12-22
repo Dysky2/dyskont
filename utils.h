@@ -55,7 +55,7 @@ extern const std::vector<std::vector<std::string>> products;
 
 // -- Funkcje globalne --
 
-// Sprawdzenie bledow wykonania danej funkcjo
+// Sprawdzenie bledow wykonania danej funkcji
 int checkError(int result, const char * msg);
 
 // pobieram aktulany czas i przypisuje go to struktury podanej jako argument
