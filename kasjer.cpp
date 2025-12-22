@@ -47,6 +47,11 @@ int main(int, char * argv[]) {
 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
 
+    if(stan_dyskontu == (void*) -1) {
+        perror("[KASJER] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
+        exit(EXIT_FAILURE);
+    }
+
     int nr_kasy = checkError(findInexOfPid(getpid(), stan_dyskontu), "Blad: nie znaleziono pidu kasy\n");
 
     while(czy_kasa_otwarta) {
@@ -181,5 +186,7 @@ int main(int, char * argv[]) {
     }
 
     komunikat << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n";
+
+    checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu" );
     exit(0);
 }

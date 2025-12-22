@@ -40,6 +40,11 @@ int main(int argc, char * argv[]) {
 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL , 0);
 
+    if(stan_dyskontu == (void*) -1) {
+        perror("[KASA] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
+        exit(EXIT_FAILURE);
+    }
+
     stringstream bufor;
     for(int i=0;i<8;i++) {
         bufor << stan_dyskontu->pid_kasy[i] << " ";
@@ -288,5 +293,7 @@ int main(int argc, char * argv[]) {
     }
     
     komunikat << "[KASA-" << getpid() << "]" << " Koniec" << "\n";
+
+    checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu" );
     exit(0);
 }

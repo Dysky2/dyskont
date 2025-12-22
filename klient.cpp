@@ -61,10 +61,32 @@ int main(int, char * argv[]) {
     ustaw_nazwe_katalogu(nazwa_katalogu);
 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
+
+    if(stan_dyskontu == (void*) -1) {
+        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
+        exit(EXIT_FAILURE);
+    }
+
     DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
 
+    if(dane_klientow == (void*) -1) {
+        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej danych klientow");
+        exit(EXIT_FAILURE);
+    }
+
     Kolejka * kolejka = new Kolejka(stan_dyskontu);
+
+    if(kolejka == (void*) -1) {
+        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej kolejki");
+        exit(EXIT_FAILURE);
+    }
+
     ListaKlientow * lista_klientow = new ListaKlientow(dane_klientow, 0);
+
+    if(lista_klientow == (void*) -1) {
+        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej listy klientow");
+        exit(EXIT_FAILURE);
+    }
 
     operacja_v(sem_id, SEMAFOR_ILOSC_KLIENTOW);
 
@@ -235,5 +257,10 @@ int main(int, char * argv[]) {
     komunikat << "WARTOSC SEMAFORA- 2: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n" << "\n";
     
+    delete kolejka;
+    delete lista_klientow;
+    
+    checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu" );
+    checkError( shmdt(dane_klientow), "Blad odlaczenia pamieci klientow" );
     exit(0);
 }

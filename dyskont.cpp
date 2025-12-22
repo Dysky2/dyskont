@@ -374,6 +374,8 @@ int main() {
     if (errno != ECHILD) {
         checkError(-1, "Blad czekania na klientow");
     }
+    
+    delete lista_klientow;
 
     checkError( shmdt(dane_klientow), "Blad odlaczenia pamieci klientow" );
     checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu" );
@@ -386,6 +388,5 @@ int main() {
     checkError( msgctl(msqid_kolejka_stac2, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
     checkError( msgctl(msqid_kolejka_obsluga, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
 
-    delete lista_klientow;
     return 0;
 }

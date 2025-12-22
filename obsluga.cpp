@@ -22,7 +22,6 @@ int main(int, char * argv[]) {
     
     komunikat << "[OBSLUGA] " << "Witam " << "\n";
 
-
     while(czy_obsluguje) {
         Obsluga obsluga;
         int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), 1, 0);
