@@ -15,14 +15,14 @@ void kontynuj_prace(int) {}
 int main(int argc, char * argv[]) {
 
     if (argc < 5) {
-        perror("Uzyto za malo argumentow w kierowniku");
+        showError("Uzyto za malo argumentow w kierowniku");
         exit(EXIT_FAILURE);
     }
 
     utworz_grupe_semaforowa();
 
     signal(SIGTERM, zamknij_kierownika);
-
+    signal(SIGINT, zamknij_kierownika);
     signal(SIGALRM, kontynuj_prace);
 
     int shmid_kasy = atoi(argv[1]);
@@ -38,7 +38,7 @@ int main(int argc, char * argv[]) {
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
 
     if(stan_dyskontu == (void*) -1) {
-        perror("[Kierownik] Bledne podlaczenie pamieci dzielonej w kierowniku");
+        showError("[Kierownik] Bledne podlaczenie pamieci dzielonej w kierowniku");
         exit(EXIT_FAILURE);
     }
 
@@ -49,17 +49,17 @@ int main(int argc, char * argv[]) {
     while (czy_kierownik_ma_dzialac) {
         int option = 0;
         if(show_panel) {
-            komunikat << "Panel kierownika, opcje do wybrania: \n";
-            komunikat << "1.Otwarcie Kasy 2\n";
-            komunikat << "2.Zamknij kase (1 lub 2)\n";
-            komunikat << "3.Koniec dyskontu\n";
+            komunikat << "[Kierownik] Panel kierownika, opcje do wybrania: \n";
+            komunikat << "[Kierownik] 1.Otwarcie Kasy 2\n";
+            komunikat << "[Kierownik] 2.Zamknij kase (1 lub 2)\n";
+            komunikat << "[Kierownik] 3.Koniec dyskontu\n";
         }
 
         if (!(cin >> option)) {
+            if(!czy_kierownik_ma_dzialac) break;
             cin.clear();
             cin.ignore(1000, '\n');
             komunikat << "[Kierownik] Musisz podac liczbe!\n";
-            break; 
         }
 
         int kasa = 0;
@@ -76,6 +76,7 @@ int main(int argc, char * argv[]) {
             case 2:
                 komunikat << "[Kierownik] Wybierz kase 1 lub 2: \n";
                 if (!(cin >> kasa)) {
+                    if(!czy_kierownik_ma_dzialac) break;
                     cin.clear();
                     cin.ignore(1000, '\n');
                     komunikat << "[Kierownik] Musisz podac liczbe!\n";
@@ -94,6 +95,7 @@ int main(int argc, char * argv[]) {
 
                         operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
                         stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 0;
+                        komunikat << "[Kierownik] Kasa 1 pomyslnie zamknieta\n";
                         break;
                     } else {
                         komunikat << "[Kierownik] Kasa jest juz zamknieta\n";
@@ -101,6 +103,7 @@ int main(int argc, char * argv[]) {
                 } else if(kasa == 2) {
                     if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 1) {
                         
+                        komunikat << "[Kierownik] Zarzadzam zamkniecie kasy 2\n";
                         stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] = 2;
                         while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0  || stan_dyskontu->dlugosc_kolejki[2] > 0) {
                             komunikat << "[Kierownik] Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
@@ -109,6 +112,7 @@ int main(int argc, char * argv[]) {
 
                         operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
                         stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] = 0;
+                        komunikat << "[Kierownik] Kasa 2 pomyslnie zamknieta\n";   
                         break;
                     }else {
                         komunikat << "[Kierownik] Kasa jest juz zamknieta\n";

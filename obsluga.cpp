@@ -13,6 +13,7 @@ void opusc_sklep(int) {
 int main(int, char * argv[]) {
     utworz_grupe_semaforowa();
 
+    signal(SIGINT, opusc_sklep);
     signal(SIGTERM, opusc_sklep);
     
     int msqid_kolejka_obsluga = atoi(argv[1]);
@@ -39,7 +40,7 @@ int main(int, char * argv[]) {
             if (errno == EINTR && czy_obsluguje) {
                 continue;
             } else {
-                perror("Blad podczas odbierania komuniaktu z kolejki");
+                showError("Blad podczas odbierania komuniaktu z kolejki");
                 exit(EXIT_FAILURE);
             }
         }

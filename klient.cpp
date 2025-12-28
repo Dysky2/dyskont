@@ -8,15 +8,12 @@ using namespace std;
 
 volatile sig_atomic_t czy_klient_ma_dzialac = 1; 
 
-void sigalrm_handler(int) { }
-
 void opusc_sklep(int) {
     czy_klient_ma_dzialac = 0;
 }
 
 // Generuje miedzy 3-10 produktów z 10 kategori i przypisuje do wskaznika na strukture Klient
 // Wpisuje ilosc_produków i liste
-
 int generateProducts(Klient *klient){
     int how_many_products = randomTimeWithRange(3, 10);
 
@@ -33,7 +30,7 @@ int generateProducts(Klient *klient){
         int len = strlen(lista_produktow[i]) + 1;
 
         if(offset + len > MAX_DATA_SIZE) {
-            perror("Za duzo danych");
+            showError("Za duzo danych");
             break;
         }
 
@@ -46,7 +43,7 @@ int generateProducts(Klient *klient){
 int main(int, char * argv[]) {
     srand(time(0) + getpid());
 
-    signal(SIGALRM, sigalrm_handler);
+    signal(SIGINT, opusc_sklep);
     signal(SIGTERM, opusc_sklep);
 
     utworz_grupe_semaforowa();
@@ -63,28 +60,28 @@ int main(int, char * argv[]) {
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
 
     if(stan_dyskontu == (void*) -1) {
-        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
+        showError("[KLIENT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
         exit(EXIT_FAILURE);
     }
 
     DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
 
     if(dane_klientow == (void*) -1) {
-        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej danych klientow");
+        showError("[KLIENT] Bledne podlaczenie pamieci dzielonej danych klientow");
         exit(EXIT_FAILURE);
     }
 
     Kolejka * kolejka = new Kolejka(stan_dyskontu);
 
     if(kolejka == (void*) -1) {
-        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej kolejki");
+        showError("[KLIENT] Bledne podlaczenie pamieci dzielonej kolejki");
         exit(EXIT_FAILURE);
     }
 
     ListaKlientow * lista_klientow = new ListaKlientow(dane_klientow, 0);
 
     if(lista_klientow == (void*) -1) {
-        perror("[KLIENT] Bledne podlaczenie pamieci dzielonej listy klientow");
+        showError("[KLIENT] Bledne podlaczenie pamieci dzielonej listy klientow");
         exit(EXIT_FAILURE);
     }
 
@@ -93,14 +90,14 @@ int main(int, char * argv[]) {
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "Wchodzi do sklepu" << "\n";
     
     // ILES CZASU JEST W SKLEPIE 
-    sleep(randomTime(5));
+    sleep(randomTime(CZAS_ROBIENIA_ZAKUPOW));
     // ten sleep powinien byc git po jakby wstrzymuje ten proces na iles
     
     int startoweId = msqid_kolejka_samo;
     int startowyNr = 0;
 
-    bool stac1 = stan_dyskontu->status_kasy[6] == 1;
-    bool stac2 = stan_dyskontu->status_kasy[7] == 1;
+    bool stac1 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] == 1;
+    bool stac2 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 1;
 
     if((stac1 || stac2) && randomTimeWithRange(1, 100) > 95) {
         if(stac1 && stac2) {
@@ -194,9 +191,17 @@ int main(int, char * argv[]) {
                 if(errno == EINTR) {
                     operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
                     break;
+                } else {
+                    operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
+                    showError("Bledne odebranie wiadomosci");
+                    exit(EXIT_FAILURE);
                 }
             } else {
-                komunikat << "[" << "KLIENT-" << getpid() << "] " << "ZAKUPY DOKONANE ILOSC PRODUKTÓW " << odebrany.ilosc_produktow << "\n";
+                if(odebrany.ilosc_produktow == 0) {
+                    komunikat << "[" << "KLIENT-" << getpid() << "] " << "Klient opuszcza sklep bez zakupow\n";
+                } else {
+                    komunikat << "[" << "KLIENT-" << getpid() << "] " << "ZAKUPY DOKONANE ILOSC PRODUKTOW: " << odebrany.ilosc_produktow << "\n";
+                }
             }
 
             operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
@@ -252,9 +257,7 @@ int main(int, char * argv[]) {
     lista_klientow->usun_klienta_z_listy(getpid());
     operacja_v(sem_id, SEMAFOR_LISTA_KLIENTOW);
 
-    komunikat << "WARTOSC SEMAFORA- 1: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";       
     operacja_p(sem_id, SEMAFOR_ILOSC_KLIENTOW);
-    komunikat << "WARTOSC SEMAFORA- 2: " << semctl(sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n" << "\n";
     
     delete kolejka;

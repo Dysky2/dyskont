@@ -18,59 +18,24 @@ void usun_zombie(int) {
 }
 
 void wylacz_sklep(int) {
-    komunikat << "[DYSKONT] ZARZADAM ZAMKNIECIE SKLEPU\n";
-
-    StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmId_kasy, NULL, 0);
-    DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
-
     ewakuacja = 1;
-
-    for(int i =0;i<8;i++) {
-        stan_dyskontu->status_kasy[i] = 0;
-        kill(stan_dyskontu->pid_kasy[i], SIGUSR2);
-    }
-
-    while(semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
-        sleep(1);
-        for(int i=0;i < dane_klientow->ilosc;i++) {
-            usleep(1000000);
-            int pid_do_ubica = dane_klientow->lista_klientow[i];
-            if(pid_do_ubica > 0) kill(pid_do_ubica, SIGTERM);
-        }
-
-        while(waitpid(-1, NULL, WNOHANG) > 0); 
-    }
-
-    if(obsluga_id > 0) {
-        int wynik = kill(obsluga_id, SIGTERM);
-        if(wynik == -1) {
-            if(errno != ESRCH) {
-                perror("Blad wyslania SIGTERM do obslugi");
-            }
-        }
-    }
-
-    for(int i =0;i<8;i++) {
-        int wynik = kill(stan_dyskontu->pid_kasy[i], SIGTERM);
-
-        if(wynik == -1) {
-            if(errno != ESRCH) {
-                perror("Blad wyslania SIGTERM do obslugi");
-            }
-        }
-    }
 }
 
 int main() {
     srand(time(0) + getpid());
 
+    if(signal(SIGINT, wylacz_sklep) == SIG_ERR) {
+        showError("[DYSKONT] Nie udalo sie ustawic handlera SIGINT");
+        exit(EXIT_FAILURE);
+    }
+
     if(signal(SIGCHLD, usun_zombie) == SIG_ERR) {
-        perror("[DYSKONT] Sygnal SIGCHLD nie zostal wykonany poprawnie");
+        showError("[DYSKONT] Nie udalo sie ustawic handlera SIGCHLD");
         exit(EXIT_FAILURE);
     }
 
     if(signal(SIGTERM, wylacz_sklep) == SIG_ERR) {
-        perror("[DYSKONT] Sygnal SIGTERM nie zostal wykonany poprawnie");
+        showError("[DYSKONT] Nie udalo sie ustawic handlera SIGTERM");
         exit(EXIT_FAILURE);
     }
 
@@ -83,7 +48,7 @@ int main() {
     DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
 
     if(dane_klientow == (void*) -1) {
-        perror("[DYSKONT] Bledne podlaczenie pamieci dzielonej klientow w dyskoncie");
+        showError("[DYSKONT] Bledne podlaczenie pamieci dzielonej klientow w dyskoncie");
         exit(EXIT_FAILURE);
     }
     
@@ -94,7 +59,7 @@ int main() {
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmId_kasy, NULL, 0);
 
     if(stan_dyskontu == (void*) -1) {
-        perror("[DYSKONT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
+        showError("[DYSKONT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
         exit(EXIT_FAILURE);
     }
     stan_dyskontu->sredni_czas_obslugi[0] = CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA;
@@ -136,35 +101,23 @@ int main() {
 
     int kierownik_pid = checkError(fork(), "Blad utowrzenia forka");
     if (kierownik_pid == 0) {
-        char cwd[PATH_MAX];
-        if (getcwd(cwd, sizeof(cwd)) == NULL) {
-            perror("Blad getcwd");
-            exit(1);
-        }
-    
-        string komenda_bash = "cd " + string(cwd) + "; ./kierownik " + 
+        string komenda_bash = "./kierownik " + 
                             to_string(shmId_kasy) + " " + 
                             to_string(dyskont_sem_id) + " " + 
                             to_string(msqid_kolejka_stac1) + " " + 
                             to_string(msqid_kolejka_stac2) + " " +
                             nazwa_katalogu + "; exec bash";
-        
-        execlp("cmd.exe", 
-            "cmd.exe",
-            "/c",
-            "start", 
-            "Okienko Kierownika",
-            "wsl.exe",  
-            "-d", "Ubuntu-22.04",
-            "--",
-            "bash", 
-            "-c", 
+        execlp("tmux",
+            "tmux",
+            "split-window",
+            "-h",
+            "-c", ".",
             komenda_bash.c_str(),
             NULL
         );
 
-        perror("Blad uruchomienia nowego okna");
-        exit(1);
+        showError("[Dyskont] Blad uruchomienia nowego okna");
+        exit(EXIT_FAILURE);
     }
 
     komunikat << "[DYSKONT] Obsluga wchodzi do sklepu" << "\n";
@@ -234,7 +187,9 @@ int main() {
     sleep(1);
 
     ListaKlientow * lista_klientow = new ListaKlientow(dane_klientow, 1);
+    int ilosc_klientow = 0;
     while( time(NULL) < dyskont_koniec && !ewakuacja) {
+
         while(dane_klientow->ilosc > MAX_ILOSC_KLIENTOW - 2 && dane_klientow->ilosc < MAX_ILOSC_KLIENTOW) {
             sleep(1);
         }
@@ -274,7 +229,11 @@ int main() {
         }
 
         // 5 10 15
-        if(semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) < 5 * (ilosc_otwratych_kas - 3)) {
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
+        if(ilosc_klientow < 5 * (ilosc_otwratych_kas - 3)) {
             komunikat << "[DYSKONT] ZAMYKAM KASE " << "\n" << "\n";
             for(int i=6;i> 0;i--) {
                 if(stan_dyskontu->status_kasy[i] == 1) {
@@ -290,8 +249,12 @@ int main() {
             }
         }
 
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
         // 15 20 25
-        if (semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) >= ilosc_otwratych_kas * 5 && ilosc_otwratych_kas <= 5) {
+        if (ilosc_klientow >= ilosc_otwratych_kas * 5 && ilosc_otwratych_kas <= 5) {
 
             int wolny_status = -1;
             for(int i =0;i <6;i++) {
@@ -322,48 +285,54 @@ int main() {
 
     // czekanie az klienci opuszcza sklep
     while (semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
-        stringstream semafory;
-        semafory << "[DYSKONT] Semafory: ";
-        for(int i=0;i<8;i++) {
-            semafory << semctl(dyskont_sem_id, i, GETVAL) << " ";
+
+        if(ewakuacja) {
+            for(int i =0;i<8;i++) {
+                if(stan_dyskontu->status_kasy[i] != 0) {
+                    stan_dyskontu->status_kasy[i] = 0;
+                    kill(stan_dyskontu->pid_kasy[i], SIGUSR2);
+                }
+            }
+            
+            for(int i=0;i < dane_klientow->ilosc;i++) {
+                usleep(1000);
+                int pid_do_ubica = dane_klientow->lista_klientow[i];
+                if(pid_do_ubica > 0) kill(pid_do_ubica, SIGTERM);
+            }
         }
-        komunikat << semafory.str() << "\n";
-        semafory.clear();
-        
-        komunikat << "[DYSKONT] Ilosc ludzi w kolejce IN SEM " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << "\n";
+
+        komunikat << "[DYSKONT] Zostalo: " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << " klientow w dyskoncie" << "\n";
         sleep(2);
     }
 
-    if(!ewakuacja) {
-
-        // Zakonczenie działania obłsugi
-        if(obsluga_id > 0) {
-            int kill_status_obsluga = kill(obsluga_id, SIGTERM);
-            if(kill_status_obsluga == -1) {
-                if(errno != ESRCH) {
-                    perror("Blad wyslania SIGTERM do obslugi");
-                }
-            }
-        }
-        
-        // Wyslanie wiadomosci o zamkniecie kas
-        komunikat << "[DYSKONT]" << "WYLACZENIE KAS" << "\n";
-        for(int i=0; i < 8;i++) {
-            int wynik = kill(stan_dyskontu->pid_kasy[i], SIGTERM);
-
-            if(wynik == -1) {
-                if(errno != ESRCH) {
-                    perror("Blad wyslania SIGTERM do obslugi");
-                }
+    // Zakonczenie działania obłsugi
+    if(obsluga_id > 0) {
+        int kill_status_obsluga = kill(obsluga_id, SIGTERM);
+        if(kill_status_obsluga == -1) {
+            if(errno != ESRCH) {
+                showError("Blad wyslania SIGTERM do obslugi");
             }
         }
     }
 
+    // Zamkniecie kas
+    komunikat << "[DYSKONT] " << "WYLACZENIE KAS" << "\n";
+    for(int i=0; i < 8;i++) {
+        int wynik = kill(stan_dyskontu->pid_kasy[i], SIGTERM);
+
+        if(wynik == -1) {
+            if(errno != ESRCH) {
+                showError("Blad wyslania SIGTERM do obslugi");
+            }
+        }
+    }
+
+    // Kierownik opusza dyskont
     if(stan_dyskontu->pid_kierownika > 0) {
         int kill_status_kierownik = kill(stan_dyskontu->pid_kierownika, SIGTERM);
         if(kill_status_kierownik == -1) {
             if(errno != ESRCH) {
-                perror("Blad wyslania SIGTERM do obslugi");
+                showError("Blad wyslania SIGTERM do obslugi");
             }
         }
     }
@@ -375,6 +344,12 @@ int main() {
         checkError(-1, "Blad czekania na klientow");
     }
     
+    if(stan_dyskontu->pid_kierownika > 0) {
+        while(kill(stan_dyskontu->pid_kierownika, 0) == 0) {
+            usleep(1000);
+        }
+    }
+
     delete lista_klientow;
 
     checkError( shmdt(dane_klientow), "Blad odlaczenia pamieci klientow" );

@@ -18,6 +18,26 @@
 #include <sys/stat.h>
 #include <limits.h>
 
+// --- KOLORY DO TERMINALA ---
+#define KOLOR_BLACK   "\x1b[30m"
+#define KOLOR_RED     "\x1b[31m"
+#define KOLOR_GREEN   "\x1b[32m"
+#define KOLOR_YELLOW  "\x1b[33m"
+#define KOLOR_BLUE    "\x1b[34m"
+#define KOLOR_MAGENTA "\x1b[35m"
+#define KOLOR_CYAN    "\x1b[36m"
+#define KOLOR_WHITE   "\x1b[37m"
+#define KOLOR_RESET   "\x1b[0m"
+
+#define KOLOR_BRIGHT_BLACK   "\x1b[90m"
+#define KOLOR_BRIGHT_RED     "\x1b[91m"
+#define KOLOR_BRIGHT_GREEN   "\x1b[92m"
+#define KOLOR_BRIGHT_YELLOW  "\x1b[93m"
+#define KOLOR_BRIGHT_BLUE    "\x1b[94m"
+#define KOLOR_BRIGHT_MAGENTA "\x1b[95m"
+#define KOLOR_BRIGHT_CYAN    "\x1b[96m"
+#define KOLOR_BRIGHT_WHITE   "\x1b[97m"
+
 // -- DEFINICJE MAKSYMALNYCH WARTOSCI --
 
 #define MAX_DATA_SIZE 512
@@ -31,8 +51,15 @@
 #define CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA 10
 #define CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA 15
 
+// -- DEFINICJE ID DLA KAS --
+
 #define ID_KASY_STACJONARNEJ_1 6
 #define ID_KASY_STACJONARNEJ_2 7
+
+// -- CZAS AKTYWNOSCI --
+
+#define CZAS_KASOWANIA_PRODUKTOW 8
+#define CZAS_ROBIENIA_ZAKUPOW 10
 
 // -- SEMAFORY --
 
@@ -54,6 +81,9 @@ extern const std::vector<std::vector<int>> products_price;
 extern const std::vector<std::vector<std::string>> products;
 
 // -- Funkcje globalne --
+
+// Wyswietlenie bledu i wyjscie z programu EXIT_FAILURE
+void showError(const char * msg);
 
 // Sprawdzenie bledow wykonania danej funkcji
 int checkError(int result, const char * msg);
@@ -84,8 +114,10 @@ void operacja_p(int semId, int semNum);
 // Podniesienie danego semafora o 1
 void operacja_v(int semId, int semNum);
 
+// Tworze katalog z aktualna data na logi
 std::string utworz_katalog_na_logi();
 
+// Ustawiam dla pliku utils.cpp katalog do ktorego powinien wrzucac logi
 void ustaw_nazwe_katalogu(std::string nazwa);
 
 // -- STRUKTURY --
@@ -94,7 +126,7 @@ struct StanDyskontu {
     int pid_kasy[ILOSC_KAS];
     int status_kasy[ILOSC_KAS]; // 0 -> kasa zamknieta 1 -> kasa otwarta 2-> kasa w stanie opruznniania
     int kolejka_klientow[ILOSC_KOLJEJEK][MAX_DLUGOSC_KOLEJEK];
-    int dlugosc_kolejki[ILOSC_KOLJEJEK];
+    int dlugosc_kolejki[ILOSC_KOLJEJEK]; // 0 -> kolejka do kasy samoobslugowej, 1 -> kolejka do kasy stacjonarnej 1, 2 -> kolejka do kasy stacjonarnej 2 
 
     float sredni_czas_obslugi[ILOSC_KOLJEJEK]; // 0 czas kasy samooblugowe, 1 -> czas kasy stacjonranerej_1, 2 -> czas kasy stacjonranerej_2
 
@@ -150,8 +182,13 @@ private:
 public:
     ListaKlientow(DaneListyKlientow * klienci_pamiec, int pierwsze_wywolanie);
 
+    // Dodaje klienta na koniec kolejki
     int dodaj_klienta_do_listy(int pid_klienta);
+
+    // Usuwam klienta ktory opuscil sklep 
     void usun_klienta_z_listy(int pid_klienta);
+
+    // Wyswietlenie wszytkich pidow klientow ktorzy znajduja sie w dyskoncie
     void wyswietl_cala_liste();
 };
 
@@ -181,8 +218,13 @@ public:
 
 // -- FUNKCJE --
 
+// Funkcja do losowania wartosci od 0 do time - 1
 int randomTime(int time);
+
+// Funkcja do losowania wartosci od min do max
 int randomTimeWithRange(int min, int max);
+
+// Pobierz ile wiadomosci znajduje sie w danej kolejce
 int pobierz_ilosc_wiadomosci(int msqid);
 int findInexOfPid(int pid, StanDyskontu * stan);
 int wyswietl_cene_produktu(const char * produkt);

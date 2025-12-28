@@ -13,9 +13,14 @@ std::string nazwa_katalogu;
 
 // -- Funkcje globalne --
 
+void showError(const char * msg) {
+    std::string blad_tresc = "\x1b[31m[ERROR]\x1b[0m " + std::string(msg);
+    perror(blad_tresc.c_str());
+}
+
 int checkError(int result, const char * msg) {
     if (result == -1) {
-        perror(msg);
+        showError(msg);
         exit(EXIT_FAILURE);
     }
     return result;
@@ -23,7 +28,7 @@ int checkError(int result, const char * msg) {
 
 void pobierz_aktualny_czas(struct tm *aktualny_czas) {
     if(aktualny_czas == NULL) {
-        perror("Podano nie prawidlowa strukturte czasu");
+        showError("Podano nie prawidlowa strukture czasu");
         exit(EXIT_FAILURE);
     }
 
@@ -32,11 +37,7 @@ void pobierz_aktualny_czas(struct tm *aktualny_czas) {
 };
 
 key_t utworz_klucz(const char znak) {
-    key_t klucz =  ftok(".", znak);
-    if (klucz == -1) {
-        perror("Bledne stowrzenia klucza");
-        exit(EXIT_FAILURE);
-    }
+    key_t klucz = checkError(ftok(".", znak), " Bledne stworzenia klucza");
     return klucz;
 }
 
@@ -50,7 +51,7 @@ int utworz_grupe_semaforowa() {
 
 void ustaw_poczatkowe_wartosci_semaforow(int semid) {
     if(semid < 0) {
-        perror("Podano nieprawidlowy semid");
+        showError("Podano nieprawidlowy semid");
         exit(EXIT_FAILURE);
     }
 
@@ -69,15 +70,15 @@ void operacja_p(int semId, int semNum) {
     operacjaP.sem_num = semNum;
     operacjaP.sem_op = -1;
     operacjaP.sem_flg = SEM_UNDO;
-    if(semop(semId, &operacjaP, 1) == -1) {
+    while(semop(semId, &operacjaP, 1) == -1) {
         if(errno == EINTR) {
-            operacja_p(semId, semNum);
-        } else {
-            char bufor[256];
-            snprintf(bufor, 256, "Bledne opnizenie semafora w operacja_p, semid %d, semNUM: %d, errno: %d", semId, semNum, errno);
-            perror(bufor);
-            exit(EXIT_FAILURE);
+            continue;
         }
+        if(errno == EINVAL || errno == EIDRM) {
+            return; 
+        }
+        showError("Bledne obnizenie semafora w operacja_p");
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -86,13 +87,26 @@ void operacja_v(int semId, int semNum) {
     operacjaV.sem_num = semNum;
     operacjaV.sem_op = 1;
     operacjaV.sem_flg = SEM_UNDO;
-    if(semop(semId, &operacjaV, 1) == -1) {
-        perror("Bledne opnizenie semafora w operacja_p");
+    while(semop(semId, &operacjaV, 1) == -1) {
+        if(errno == EINTR) {
+            continue;
+        }
+        if(errno == EINVAL || errno == EIDRM) {
+            return; 
+        }
+        showError("Bledne podniesienie semafora w operacja_v");
         exit(EXIT_FAILURE);
     }
 }
 
 std::string utworz_katalog_na_logi() {
+    int log_status_katalog = mkdir("./Logi", 0700);
+    if(log_status_katalog == -1) {
+        if(errno != EEXIST) {
+            showError("Nie mozna utworzyc katalogu");
+        }
+    }
+
     char bufor_data[64];
 
     struct tm czas;
@@ -103,10 +117,8 @@ std::string utworz_katalog_na_logi() {
     int status_katalogu = mkdir(bufor_data, 0700);
 
     if(status_katalogu == -1) {
-        if(errno == EEXIST) {
-            perror("Katalog juz istnieje");
-        } else {
-            perror("Nie mozna utworzyc katalogu");
+        if(errno != EEXIST) {
+            showError("Nie mozna utworzyc katalogu");
         }
     }
 
@@ -127,7 +139,8 @@ AtomicLogger::AtomicLogger() {
 }
 
 AtomicLogger::~AtomicLogger() {
-    // bufor << "\n";
+    std::string surowa_tresc = bufor.str();
+
     std::string nazwa_pliku;
     int nazwa_sie_zgadza = 0;
     std::string str_bufor = bufor.str();
@@ -146,30 +159,54 @@ AtomicLogger::~AtomicLogger() {
         }
     }
 
+    const char* kolor_linii = KOLOR_RESET;
+
+    if (nazwa_pliku == "dyskont") {
+        kolor_linii = KOLOR_YELLOW;
+    } else if (nazwa_pliku == "klient") {
+        kolor_linii = KOLOR_CYAN;
+    } else if (nazwa_pliku == "kasa") {
+        kolor_linii = KOLOR_BRIGHT_CYAN;
+    } else if (nazwa_pliku == "kasjer") {
+        kolor_linii = KOLOR_GREEN;
+    } else if (nazwa_pliku == "kierownik") {
+        kolor_linii = KOLOR_MAGENTA;
+    } else if (nazwa_pliku == "obsluga") {
+        kolor_linii = KOLOR_BRIGHT_BLACK;
+    } else if(nazwa_pliku == "error") {
+        kolor_linii = KOLOR_RED;
+    }
+
     int fd = -1;
     if(nazwa_pliku.length() > 0) {
         std::string sciezka = nazwa_katalogu + "/" + nazwa_pliku + ".log";
         fd = open(sciezka.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0600);
         checkError(fd, "Bledne otawrce pliku ");
     }
-    
+
     operacja_p(sem_id, SEMAFOR_OUTPUT);
-    std::string tresc = bufor.str();
+
     if(fd != -1 && nazwa_pliku.length() > 0) {
-        int file_status = write(fd, tresc.c_str(), tresc.length());
+        int file_status = write(fd, surowa_tresc.c_str(), surowa_tresc.length());
         if(file_status == -1) {
             operacja_v(sem_id, SEMAFOR_OUTPUT);
-            perror("Blad zapisu write do pliku");
+            showError("Blad zapisu write do pliku");
             close(fd);
             exit(EXIT_FAILURE);
         }
         close(fd);
     }
-    int status = write(1, tresc.c_str(), tresc.length());
+
+    std::string tresc_z_kolorem = std::string(kolor_linii) + surowa_tresc + KOLOR_RESET;
+
+    if (surowa_tresc.back() != '\n') {
+        tresc_z_kolorem += "\n";
+    }
+
+    int status = write(STDOUT_FILENO, tresc_z_kolorem.c_str(), tresc_z_kolorem.length());
     if(status == -1) {
         operacja_v(sem_id, SEMAFOR_OUTPUT);
-        perror("Blad zapisu write");
-        exit(EXIT_FAILURE);
+        showError("Blad zapisu write");
     }
 
     operacja_v(sem_id, SEMAFOR_OUTPUT);
@@ -189,7 +226,7 @@ int ListaKlientow::dodaj_klienta_do_listy(int pid_klienta) {
         if(klienci->ilosc >= 0 && klienci->ilosc < MAX_ILOSC_KLIENTOW) {
             klienci->lista_klientow[klienci->ilosc++] = pid_klienta;
         } else {
-            komunikat << "[UTLIS-dodaj-klienta] " << "Za duzo ludzi w skelpie\n";
+            komunikat << "Za duzo ludzi w skelpie\n";
             return 0;
         }
         return 1;
@@ -197,7 +234,7 @@ int ListaKlientow::dodaj_klienta_do_listy(int pid_klienta) {
 
 void ListaKlientow::usun_klienta_z_listy(int pid_klienta) {
         if(pid_klienta < 0) {
-            perror("Nie ma klienta o takim pidzie w kolejce");
+            showError("Nie ma klienta o takim pidzie w kolejce");
             return;
         }
 
@@ -244,7 +281,7 @@ void Kolejka::dodaj_do_kolejki(int pid_klienta, int nr_kolejki) {
 
 void Kolejka::usun_z_kolejki(int pid_klienta, int nr_kolejki) {
     if(nr_kolejki < 0 || nr_kolejki >= 3) {
-        perror("blad usuniecia kolejki");
+        showError("Blad usuniecia klienta z kolejki");
         return;
     }
     int ilosc_osob_w_kolejce = stan_dyskontu->dlugosc_kolejki[nr_kolejki];
@@ -359,15 +396,15 @@ const std::vector<std::vector<int>> products_price = {
 
 const std::vector<std::vector<std::string>> products = {
     {"Jablko", "Banan", "Gruszka", "Truskawka", "Arbuz"},
-    {"Marchew", "Ziemniak", "Pomidor", "Ogorek" },
+    {"Marchew", "Ziemniak", "Pomidor", "Ogorek"},
     {"Chleb Razowy", "Bulka Kajzerka", "Bagietka"},
-    {"Mleko", "Ser Zolty", "Jogurt Naturalny", "Maslo", "Smietana", "Kefir" },
+    {"Mleko", "Ser Zolty", "Jogurt Naturalny", "Maslo", "Smietana", "Kefir"},
     {"Piwo", "Wino", "Wodka", "Whisky"},
-    {"Szynka Babuni", "Kielbasa Slaska", "Kabanosy", "Parowki", "Salami" },
+    {"Szynka Babuni", "Kielbasa Slaska", "Kabanosy", "Parowki", "Salami"},
     {"Spaghetti", "Swiderki", "Penne"},
-    { "Woda Niegazowana", "Cola", "Sok Pomaranczowy", "Zielona Herbata"},
+    {"Woda Niegazowana", "Cola", "Sok Pomaranczowy", "Zielona Herbata"},
     {"Piers z Kurczaka", "Schab", "Wolowina", "Mielone"},
-    { "Losos", "Dorsz", "Pstrag"}
+    {"Losos", "Dorsz", "Pstrag"}
 };
 
 // -- FUNKCJE --
@@ -390,7 +427,7 @@ int pobierz_ilosc_wiadomosci(int msqid) {
     if (msgctl(msqid, IPC_STAT, &buf) == -1) {
         char perror_buffor[256];
         snprintf(perror_buffor, 256, "Blad msgctl z odbiorem danych, msqid %d, errno: %d", msqid, errno);
-        perror(perror_buffor);
+        showError(perror_buffor);
         return -1; 
     }
 
@@ -418,4 +455,3 @@ int wyswietl_cene_produktu(const char * produkt) {
     }
     return 0;
 };
-

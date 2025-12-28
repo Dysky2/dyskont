@@ -18,12 +18,13 @@ int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
 
     signal(SIGUSR1, zacznij_prace);
+    signal(SIGINT, zamknij_kase);
     signal(SIGTERM, zamknij_kase);
     signal(SIGUSR2, przerwij_prace);
 
     if(argc <= 3) {
-        perror("Podano za malo argumentow dla kasy");
-        exit(1);
+        showError("Podano za malo argumentow dla kasy");
+        exit(EXIT_FAILURE);
     }
 
     utworz_grupe_semaforowa();
@@ -41,11 +42,12 @@ int main(int argc, char * argv[]) {
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL , 0);
 
     if(stan_dyskontu == (void*) -1) {
-        perror("[KASA] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
+        showError("[KASA] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
         exit(EXIT_FAILURE);
     }
 
     stringstream bufor;
+    bufor << "[KASA] ";
     for(int i=0;i<8;i++) {
         bufor << stan_dyskontu->pid_kasy[i] << " ";
     }
@@ -77,7 +79,7 @@ int main(int argc, char * argv[]) {
 
         komunikat << "[KASA-" << getpid() << "-" <<klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
         
-        sleep(randomTime(5));
+        sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW));
         
         if(!czy_kasa_otwarta) continue;
 
@@ -94,19 +96,17 @@ int main(int argc, char * argv[]) {
         paragon << "|          32-000 Kraków           |" << "\n";
         paragon << "|----------------------------------|" << "\n";
         paragon << "|    Paragon fiskalny nr:  " << left << setw(8) << randomTime(10000) << "|\n";
-        paragon << "|    ID kasy samoobslugowej: " << left << setw(6) << getpid() << "|\n";
+        paragon << "|    ID kasy: " << left << setw(21) << getpid() << "|\n";
         paragon << "|    Kasa samoobslugowa nr: " << left << setw(7) << klient.nrKasy << "|\n";
         paragon << "|    Data: " << left << setw(24) << bufor_czasu << "|\n";
         paragon << "|----------------------------------|" << "\n";
         paragon << "| Towar                    Wartosc |" << "\n";
         paragon << "|                                  |" << "\n";
 
-        int aktualna_pozycja = 0, suma = 0, czy_klient_zostal_sprawdzony = 0, czy_jest_pelnoletni = 0;
+        int aktualna_pozycja = 0, suma = 0, czy_klient_zostal_sprawdzony = 0, czy_jest_pelnoletni = 0 , ile_produktow_odlozonych = 0;
         for(int i=0;i < klient.ilosc_produktow;i++) {
 
-            if(!czy_kasa_otwarta) {
-                break; 
-            }
+            if(!czy_kasa_otwarta) break; 
 
             // 2% szans ze kasa utknie
             if(randomTimeWithRange(1, 100) > 98) {
@@ -125,8 +125,8 @@ int main(int argc, char * argv[]) {
                             i--;
                             continue;
                         } else {
-                            perror("Blad msgsnd waga");
                             operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            showError("Bledne wyslanie wiadomosci do oblugi o sprawdzenie waga");
                             exit(EXIT_FAILURE);
                         }
                     }
@@ -153,7 +153,7 @@ int main(int argc, char * argv[]) {
                         i--;
                         continue;
                     } else {
-                        perror("Blad odebrania wiadomosci od obslugi");
+                        showError("Blad odebrania wiadomosci od obslugi");
                         exit(EXIT_FAILURE);
                     }
                 }
@@ -179,8 +179,8 @@ int main(int argc, char * argv[]) {
                                 i--;
                                 continue;
                             } else {
-                                perror("Blad msgsnd waga");
                                 operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                                showError("Bledne wyslanie wiadomosci do oblugi o sprawdzenie alkoholu");
                                 exit(EXIT_FAILURE);
                             }
                         }
@@ -206,7 +206,7 @@ int main(int argc, char * argv[]) {
                             i--;
                             continue;
                         } else {
-                            perror("Blad odebrania wiadomosci od obslugi");
+                            showError("Blad odebrania wiadomosci od obslugi");
                             exit(EXIT_FAILURE);
                         }
                     }
@@ -226,21 +226,16 @@ int main(int argc, char * argv[]) {
                     int cena = wyswietl_cene_produktu(produkt);
                     suma += cena;
                     paragon << "| " << left << setw(21) << produkt 
-                        << right << setw(8) << cena << " zl |";
-                    if (i < klient.ilosc_produktow - 1) {
-                        paragon << "\n";
-                    }
+                        << right << setw(8) << cena << " zl |\n";
                 } else {
                     komunikat << "[KASA-" << getpid() << "] " << "Produkt wycofany: " << produkt << "\n";
+                    ile_produktow_odlozonych++;
                 }
             } else {
                 int cena = wyswietl_cene_produktu(produkt);
                 suma += cena;
                 paragon << "| " << left << setw(21) << produkt 
-                    << right << setw(8) << cena << " zl |";
-                if (i < klient.ilosc_produktow - 1) {
-                    paragon << "\n";
-                }
+                    << right << setw(8) << cena << " zl |\n";
             }
 
             aktualna_pozycja += strlen(produkt) + 1;
@@ -251,8 +246,21 @@ int main(int argc, char * argv[]) {
             paragon.clear();
             continue;
         }
+
+        if(suma == 0) {
+            komunikat << "[KASA-" << getpid() << "]" << " klient odlozyl wszystkie produktu\n";
+            paragon.str("");
+            paragon.clear();
+
+            if(kill(klient.klient_id, 0) == 0) {
+                klient.mtype = klient.klient_id;
+                klient.ilosc_produktow = klient.ilosc_produktow - ile_produktow_odlozonych;
+                msgsnd(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 0);
+            }
+
+            continue;
+        }
         
-        paragon << "\n";
         paragon << "|----------------------------------|" << "\n";
         paragon << "|                                  |" << "\n";
         paragon << "| " << left << setw(10) << "Suma PLN" << right << setw(19) << suma << " zl |\n";
@@ -260,13 +268,10 @@ int main(int argc, char * argv[]) {
         paragon << "|==================================|" << "\n";
         paragon << "|      POTWIERDZENIE PLATNOSCI     |" << "\n";
         paragon << "|          KARTA PLATNICZA         |" << "\n";
-        paragon << "|                                  |" << "\n";
-        paragon << "| MERCH ID: " << left << setw(23) << (randomTimeWithRange(10000000, 99999999)) << "|\n";
-        paragon << "| TERM ID:  " << left << setw(23) << ("T000" + to_string(klient.nrKasy)) << "|\n";
         paragon << "|                                  |\n";
+        paragon << "| Klient:   " << left << setw(23) << klient.klient_id << "|\n";
         paragon << "| KARTA:    " << left << setw(23) << "VISA CONTACTLESS" << "|\n";
-        paragon << "| NR KARTY:      ************" << left << setw(6) << (1000 + rand() % 9000) << "|\n";
-        paragon << "| AID:      A0000000031010         |\n";
+        paragon << "| NR KARTY: ************" << left << setw(11) << (1000 + rand() % 9000) << "|\n";
         paragon << "|                                  |\n";
         paragon << "| SPRZEDAZ                         |\n";
         paragon << "| KOD AUT.: " << left << setw(23) << (100000 + rand() % 900000) << "|\n";
@@ -284,10 +289,11 @@ int main(int argc, char * argv[]) {
         paragon << "| DZIEKUJEMY I ZAPRASZAMY PONOWNIE |\n";
         paragon << "'=================================='" << "\n"; 
 
-        komunikat << paragon.str() << "\n";
+        komunikat << "[KASA-" << getpid() << "]" << paragon.str() << "\n";
 
         if(kill(klient.klient_id, 0) == 0) {
             klient.mtype = klient.klient_id;
+            klient.ilosc_produktow = klient.ilosc_produktow - ile_produktow_odlozonych;
             msgsnd(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 0);
         }
     }
