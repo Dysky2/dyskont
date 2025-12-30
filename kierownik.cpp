@@ -13,7 +13,10 @@ void zamknij_kierownika(int) {
 void kontynuj_prace(int) {}
 
 int main(int argc, char * argv[]) {
+    srand(time(0) + getpid());
 
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
+    
     if (argc < 5) {
         showError("Uzyto za malo argumentow w kierowniku");
         exit(EXIT_FAILURE);
@@ -42,7 +45,9 @@ int main(int argc, char * argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
     stan_dyskontu->pid_kierownika = getpid();
+    operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
     int show_panel = 1;
 
@@ -67,8 +72,14 @@ int main(int argc, char * argv[]) {
             case 1:
                 if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 0) {
                     operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
+
                     komunikat << "[Kierownik] Zarzadam otwarcie kasy stacjonarnej 2\n";
+
+                    operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                    stan_dyskontu->status_kasy[7] = 1;
                     kill(stan_dyskontu->pid_kasy[ID_KASY_STACJONARNEJ_2], SIGUSR1);
+                    operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+                    
                 } else {
                     komunikat << "[Kierownik] Ta kasa jest juz otwarta\n";
                 }
@@ -83,35 +94,64 @@ int main(int argc, char * argv[]) {
                     break; 
                 }
                 if(kasa == 1) {
-                    if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] == 1) {
+                    operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                    int status_kasy = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1];
+                    operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);  
 
+                    if(status_kasy == 1) {
                         komunikat << "[Kierownik] Zarzadzam zamkniecie kasy 1\n";
-                        stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 2;
 
-                        while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac1) > 0 || stan_dyskontu->dlugosc_kolejki[1] > 0) {
-                            komunikat << "[Kierownik] Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
-                            sleep(2);
-                        }
+                        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                        stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 2;
+                        int dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[1];
+                        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
                         operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
+
+                        while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac1) > 0 || dlugosc_kolejki > 0) {
+                            komunikat << "[Kierownik] Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
+                            sleep(3);
+                            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                            dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[1];
+                            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+                        }
+
+                        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                         stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 0;
+                        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
                         komunikat << "[Kierownik] Kasa 1 pomyslnie zamknieta\n";
                         break;
                     } else {
                         komunikat << "[Kierownik] Kasa jest juz zamknieta\n";
                     }
                 } else if(kasa == 2) {
-                    if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 1) {
-                        
+                    operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                    int status_kasy = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2];
+                    operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                    if(status_kasy == 1) {
                         komunikat << "[Kierownik] Zarzadzam zamkniecie kasy 2\n";
+
+                        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                         stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] = 2;
-                        while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0  || stan_dyskontu->dlugosc_kolejki[2] > 0) {
-                            komunikat << "[Kierownik] Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
-                            sleep(2);
-                        }
+                        int dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[2];
+                        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
                         operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
+
+                        while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0  || dlugosc_kolejki > 0) {
+                            komunikat << "[Kierownik] Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
+                            sleep(3);
+                            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                            dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[2];
+                            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+                        }
+
+                        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                         stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] = 0;
+                        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
                         komunikat << "[Kierownik] Kasa 2 pomyslnie zamknieta\n";   
                         break;
                     }else {

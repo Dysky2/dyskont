@@ -43,6 +43,8 @@ int generateProducts(Klient *klient){
 int main(int, char * argv[]) {
     srand(time(0) + getpid());
 
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
+
     signal(SIGINT, opusc_sklep);
     signal(SIGTERM, opusc_sklep);
 
@@ -96,8 +98,10 @@ int main(int, char * argv[]) {
     int startoweId = msqid_kolejka_samo;
     int startowyNr = 0;
 
+    operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
     bool stac1 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] == 1;
     bool stac2 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 1;
+    operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
     if((stac1 || stac2) && randomTimeWithRange(1, 100) > 95) {
         if(stac1 && stac2) {
@@ -124,7 +128,9 @@ int main(int, char * argv[]) {
     if(czy_klient_ma_dzialac) {
 
         operacja_p(sem_id, aktualnyNr);
+        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
         kolejka->dodaj_do_kolejki(getpid(), aktualnyNr);
+        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
         operacja_v(sem_id, aktualnyNr);
 
         komunikat << "[" << "KLIENT-" << getpid() << "] " << "Staje do kasy " << aktualnyNr << "\n";
@@ -134,13 +140,21 @@ int main(int, char * argv[]) {
     while(czy_klient_ma_dzialac) {
         sleep(2);
         operacja_p(sem_id, aktualnyNr);
+        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
         int czy_jestem_pierwszy = kolejka->czy_jestem_pierwszy(getpid(), aktualnyNr);
+        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
         operacja_v(sem_id, aktualnyNr);
 
         if(czy_jestem_pierwszy) {
-            komunikat << "[KLIENT-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
-            komunikat << "[KLIENT-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
-            komunikat << "[KLIENT-" << getpid() << "] " << "Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
+            stringstream kolejki;
+            kolejki << "[KLIENT] Ilosc ludzi w kolejce ";
+            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+            for(int i=0; i < ILOSC_KOLJEJEK; i++) {
+                kolejki << stan_dyskontu->dlugosc_kolejki[i] << " ";
+            }
+            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);   
+            komunikat << kolejki.str() << "\n";
+            kolejki.clear();
 
             operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
 
@@ -149,17 +163,25 @@ int main(int, char * argv[]) {
             int dlugosc_tekstu = generateProducts(&klient);
 
             int id_statusu = 0;
-            if(aktualnyNr == 1) id_statusu = 6;
-            if(aktualnyNr == 2) id_statusu = 7;
+            if(aktualnyNr == 1) id_statusu = ID_KASY_STACJONARNEJ_1;
+            if(aktualnyNr == 2) id_statusu = ID_KASY_STACJONARNEJ_2;
 
-            if(stan_dyskontu->status_kasy[id_statusu] != 1) {
+            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+            int status_kasy = stan_dyskontu->status_kasy[id_statusu];
+            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
+            if(status_kasy != 1) {
 
                 operacja_p(sem_id, aktualnyNr);
+                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                 kolejka->usun_z_kolejki(getpid(), aktualnyNr);
+                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
                 operacja_v(sem_id, aktualnyNr);
 
                 operacja_p(sem_id, 0);
+                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                 kolejka->dodaj_do_kolejki(getpid(), 0);
+                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
                 operacja_v(sem_id, 0);
 
                 operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
@@ -174,7 +196,9 @@ int main(int, char * argv[]) {
             int status = msgsnd(aktualneId, &klient, sizeof(int) * 4 + dlugosc_tekstu, 0);
             if(status != -1) {
                 operacja_p(sem_id, aktualnyNr);
+                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                 kolejka->usun_z_kolejki(getpid(), aktualnyNr);
+                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
                 operacja_v(sem_id, aktualnyNr);
 
                 komunikat << "[" << "KLIENT-" << getpid() << "] " << "Ide do kasy nr: " << aktualnyNr << "\n";
@@ -211,7 +235,9 @@ int main(int, char * argv[]) {
         if(time(NULL) - czas_startu > 10) {
 
             operacja_p(sem_id, aktualnyNr);
+            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
             int nr_kolejki_do_zmiany = kolejka->czy_oplaca_sie_zmienic_kolejke(getpid(), aktualnyNr);
+            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
             operacja_v(sem_id, aktualnyNr);
 
 
@@ -220,10 +246,15 @@ int main(int, char * argv[]) {
                 int czy_mozna_sie_przeniesc = 0;
                 int nowe_id_kolejki = msqid_kolejka_samo;
 
-                if(nr_kolejki_do_zmiany == 1 && stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] == 1) {
+                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                int status_kas_stac1 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1];
+                int status_kas_stac2 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2];
+                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                if(nr_kolejki_do_zmiany == 1 && status_kas_stac1 == 1) {
                     czy_mozna_sie_przeniesc = 1;
                     nowe_id_kolejki = msqid_kolejka_stac1;
-                } else if(nr_kolejki_do_zmiany == 2 && stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 1) {
+                } else if(nr_kolejki_do_zmiany == 2 && status_kas_stac2 == 1) {
                     czy_mozna_sie_przeniesc = 1;
                     nowe_id_kolejki = msqid_kolejka_stac2;
                 }
@@ -232,11 +263,15 @@ int main(int, char * argv[]) {
                     komunikat << "[" << "KLIENT-" << getpid() << "] " << "Zmienia kase z " << aktualnyNr << " do " << nr_kolejki_do_zmiany << "\n";
 
                     operacja_p(sem_id, aktualnyNr);
+                    operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                     kolejka->usun_z_kolejki(getpid(), aktualnyNr);
+                    operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
                     operacja_v(sem_id, aktualnyNr);
 
                     operacja_p(sem_id, nr_kolejki_do_zmiany);
+                    operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                     kolejka->dodaj_do_kolejki(getpid(), nr_kolejki_do_zmiany);
+                    operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
                     operacja_v(sem_id, nr_kolejki_do_zmiany);
 
                     aktualnyNr = nr_kolejki_do_zmiany;
@@ -249,7 +284,9 @@ int main(int, char * argv[]) {
 
     if(!czy_klient_ma_dzialac) {
         operacja_p(sem_id, aktualnyNr);
+        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
         kolejka->usun_z_kolejki(getpid(), aktualnyNr);
+        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
         operacja_v(sem_id, aktualnyNr);
     }
 
@@ -258,7 +295,7 @@ int main(int, char * argv[]) {
     operacja_v(sem_id, SEMAFOR_LISTA_KLIENTOW);
 
     operacja_p(sem_id, SEMAFOR_ILOSC_KLIENTOW);
-    komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n" << "\n";
+    komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n";
     
     delete kolejka;
     delete lista_klientow;

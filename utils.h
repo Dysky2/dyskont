@@ -16,6 +16,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/prctl.h>
 #include <limits.h>
 
 // --- KOLORY DO TERMINALA ---
@@ -53,15 +54,18 @@
 
 // -- DEFINICJE ID DLA KAS --
 
+#define ID_KASY_SAMOOBSLUGOWEJ 0
 #define ID_KASY_STACJONARNEJ_1 6
 #define ID_KASY_STACJONARNEJ_2 7
 
 // -- CZAS AKTYWNOSCI --
 
-#define CZAS_KASOWANIA_PRODUKTOW 8
-#define CZAS_ROBIENIA_ZAKUPOW 10
+#define CZAS_KASOWANIA_PRODUKTOW 4
+#define CZAS_ROBIENIA_ZAKUPOW 20
 
 // -- SEMAFORY --
+
+#define ILOSC_SEMAFOROW 9
 
 #define SEMAFOR_SAMOOBSLUGA 0
 #define SEMAFOR_STAC1 1
@@ -71,6 +75,9 @@
 #define SEMAFOR_OBSLUGA 5
 #define SEMAFOR_LISTA_KLIENTOW 6
 #define SEMAFOR_OUTPUT 7
+#define SEMAFOR_STAN_DYSKONTU 8
+
+#define LICZBA_KLIENTOW_NA_KASE 7
 
 // -- ZMIENNE GLOBALNE -- 
 

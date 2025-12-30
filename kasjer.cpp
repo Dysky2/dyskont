@@ -6,8 +6,6 @@ using namespace std;
 
 volatile sig_atomic_t czy_kasa_otwarta = 1; 
 
-int shmid_kasy = 0;
-
 void zacznij_prace(int) { }
 
 void wstrzymaj_kase(int) { }
@@ -18,16 +16,13 @@ void zamknij_kase(int) {
     czy_kasa_otwarta = 0;
 }
 
-void otworz_kase_stac2(int) {
-    StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmid_kasy, NULL, 0);
-    if(stan_dyskontu->status_kasy[7] == 1) {
-    } else {
-        komunikat << "Otwieram kase stacjonarna 2\n";
-        stan_dyskontu->status_kasy[7] = 1;
-    }
-}
+void otworz_kase_stac2(int) { }
 
 int main(int, char * argv[]) {
+    srand(time(0) + getpid());
+
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
+    
     utworz_grupe_semaforowa();
 
     signal(SIGALRM, wstrzymaj_kase);
@@ -37,7 +32,7 @@ int main(int, char * argv[]) {
     signal(SIGTERM, zamknij_kase);
     
     int sem_id = atoi(argv[1]);
-    shmid_kasy = atoi(argv[2]);
+    int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_stac1 = atoi(argv[3]);
     int msqid_kolejka_stac2 = atoi(argv[4]);
     string nazwa_katalogu = argv[5];
@@ -57,14 +52,20 @@ int main(int, char * argv[]) {
 
     while(czy_kasa_otwarta) {
         int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
+        
+        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+        int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
+        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
-        if(stan_dyskontu->status_kasy[nr_kasy] == 0) {
+        if(status_kasy == 0) {
             if(pobierz_ilosc_wiadomosci(id_kasy) < 0) {
             } else {
-                pause();
+                sleep(1);
                 continue;
             }
         } 
+
+        komunikat << "[KASJER-" << getpid() << "]" << " Zaczynam dzialanie \n";
 
         Klient klient;
         memset(&klient, 0, sizeof(Klient));
@@ -79,15 +80,21 @@ int main(int, char * argv[]) {
         }
 
         if(status == -1) {
-            if(errno == EINTR && (stan_dyskontu->dlugosc_kolejki[nr_kasy == 6 ? 1 : 2] > 0)) {
+            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+            int dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[nr_kasy == 6 ? 1 : 2];
+            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
+            if(errno == EINTR && (dlugosc_kolejki > 0)) {
                 continue;
             }
             if(errno == EIDRM || errno == EINVAL) break;
             if(errno == EINTR) {
                 komunikat << "[KASJER-" << getpid() << "] " << "Zamykam kase gdzy nie pojawil sie zaden klient: "<< "\n";
-                struct sembuf operacjaP = {SEMAFOR_ILOSC_KAS, -1, SEM_UNDO};
-                semop(sem_id, &operacjaP, 1);
+                operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
+
+                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                 stan_dyskontu->status_kasy[nr_kasy] = 0;
+                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
                 continue;
             }
         }
@@ -99,10 +106,6 @@ int main(int, char * argv[]) {
         if(!czy_kasa_otwarta) continue;
         
         stringstream paragon;
-        struct tm timeinfo;
-        pobierz_aktualny_czas(&timeinfo);
-        char bufor_czasu[80];
-        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", &timeinfo);
 
         paragon << "\n";
         paragon << ".==================================." << "\n";
@@ -113,7 +116,6 @@ int main(int, char * argv[]) {
         paragon << "|    Paragon fiskalny nr:  " << left << setw(8) << randomTime(10000) << "|\n";
         paragon << "|    ID kasy stacjonarnej: " << left << setw(8) << getpid() << "|\n";
         paragon << "|    Kasa stacjonrana nr: " << left << setw(9) << klient.nrKasy << "|\n";
-        paragon << "|    Data: " << left << setw(24) << bufor_czasu << "|\n";
         paragon << "|----------------------------------|" << "\n";
         paragon << "| Towar                    Wartosc |" << "\n";
         paragon << "|                                  |" << "\n";
@@ -154,7 +156,11 @@ int main(int, char * argv[]) {
             continue;
         }
 
-        paragon << "\n";
+        struct tm timeinfo;
+        pobierz_aktualny_czas(&timeinfo);
+        char bufor_czasu[80];
+        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", &timeinfo);
+
         paragon << "|----------------------------------|" << "\n";
         paragon << "|                                  |" << "\n";
         paragon << "| " << left << setw(10) << "Suma PLN" << right << setw(19) << suma << " zl |\n";
@@ -166,6 +172,7 @@ int main(int, char * argv[]) {
         paragon << "| Klient:   " << left << setw(23) << klient.klient_id << "|\n";
         paragon << "| KARTA:    " << left << setw(23) << "VISA CONTACTLESS" << "|\n";
         paragon << "| NR KARTY: ************" << left << setw(11) << (1000 + rand() % 9000) << "|\n";
+        paragon << "|    Data: " << left << setw(24) << bufor_czasu << "|\n";
         paragon << "|                                  |\n";
         paragon << "| SPRZEDAZ                         |\n";
         paragon << "| KOD AUT.: " << left << setw(23) << (100000 + rand() % 900000) << "|\n";
@@ -182,7 +189,7 @@ int main(int, char * argv[]) {
         paragon << "|                                  |\n";
         paragon << "| DZIEKUJEMY I ZAPRASZAMY PONOWNIE |\n";
         paragon << "'=================================='" << "\n"; 
-        komunikat << "[KASJER]" << paragon.str() << "\n";
+        komunikat << "[KASJER-" << getpid() << "]" << paragon.str() << "\n";
 
         if(kill(klient.klient_id, 0) == 0) {
             klient.mtype = klient.klient_id;
@@ -190,9 +197,6 @@ int main(int, char * argv[]) {
             msgsnd(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 0);
         }
 
-        komunikat << "[KASJER-" << getpid() << "] " <<  "Ilosc ludzi w kolejce: " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
-        komunikat << "[KASJER-" << getpid() << "] " <<  "Ilosc ludzi w kolejce: " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
-        komunikat << "[KASJER-" << getpid() << "] " <<  "Ilosc ludzi w kolejce: " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
     }
 
     komunikat << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n";

@@ -11,6 +11,8 @@ void opusc_sklep(int) {
 }
 
 int main(int, char * argv[]) {
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
+
     utworz_grupe_semaforowa();
 
     signal(SIGINT, opusc_sklep);

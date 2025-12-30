@@ -43,7 +43,7 @@ key_t utworz_klucz(const char znak) {
 
 int utworz_grupe_semaforowa() {
     sem_id = checkError(
-        semget(utworz_klucz('A'), 8, IPC_CREAT|0600),
+        semget(utworz_klucz('A'), ILOSC_SEMAFOROW, IPC_CREAT|0600),
         "Blad utworzenia semaforow"
     );
     return sem_id;
@@ -63,6 +63,7 @@ void ustaw_poczatkowe_wartosci_semaforow(int semid) {
     checkError(semctl(semid, SEMAFOR_OBSLUGA, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_OBSLUGA");
     checkError(semctl(semid, SEMAFOR_LISTA_KLIENTOW, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_LISTA_KLIENTOW");
     checkError(semctl(semid, SEMAFOR_OUTPUT, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_OUTPUT");
+    checkError(semctl(semid, SEMAFOR_STAN_DYSKONTU, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_OUTPUT");
 }
 
 void operacja_p(int semId, int semNum) {
@@ -272,7 +273,7 @@ Kolejka::Kolejka(StanDyskontu * stan_dyskontu) {
 
 void Kolejka::dodaj_do_kolejki(int pid_klienta, int nr_kolejki) {
     int index = stan_dyskontu->dlugosc_kolejki[nr_kolejki];
-    if(index < 0 || index >= 100) {
+    if(index < 0 || index >= MAX_ILOSC_KLIENTOW) {
         return;
     }
     stan_dyskontu->kolejka_klientow[nr_kolejki][index] = pid_klienta;
@@ -280,7 +281,7 @@ void Kolejka::dodaj_do_kolejki(int pid_klienta, int nr_kolejki) {
 }
 
 void Kolejka::usun_z_kolejki(int pid_klienta, int nr_kolejki) {
-    if(nr_kolejki < 0 || nr_kolejki >= 3) {
+    if(nr_kolejki < 0 || nr_kolejki >= ILOSC_KOLJEJEK) {
         showError("Blad usuniecia klienta z kolejki");
         return;
     }

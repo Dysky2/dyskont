@@ -17,6 +17,8 @@ void zacznij_prace(int) { }
 int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
 
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
+
     signal(SIGUSR1, zacznij_prace);
     signal(SIGINT, zamknij_kase);
     signal(SIGTERM, zamknij_kase);
@@ -49,10 +51,14 @@ int main(int argc, char * argv[]) {
     stringstream bufor;
     bufor << "[KASA] ";
     for(int i=0;i<8;i++) {
+        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
         bufor << stan_dyskontu->pid_kasy[i] << " ";
+        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
     }
     for(int i=0;i<8;i++) {
+        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);  
         bufor << stan_dyskontu->status_kasy[i] << " ";
+        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
     }
     bufor << "\n";
     komunikat << bufor.str();
@@ -61,7 +67,10 @@ int main(int argc, char * argv[]) {
     int nr_kasy = checkError(findInexOfPid(getpid(), stan_dyskontu), "Blad: nie znaleziono pidu kasy\n");
 
     while(czy_kasa_otwarta) {
-        if(stan_dyskontu->status_kasy[nr_kasy] == 0) {
+        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+        int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
+        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+        if(status_kasy == 0) {
             pause();
             continue;
         }
@@ -77,17 +86,13 @@ int main(int argc, char * argv[]) {
             else break;
         }
 
-        komunikat << "[KASA-" << getpid() << "-" <<klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
+        komunikat << "[KASA-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
         
         sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW));
         
         if(!czy_kasa_otwarta) continue;
 
         stringstream paragon;
-        struct tm timeinfo;
-        pobierz_aktualny_czas(&timeinfo);
-        char bufor_czasu[80];
-        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", &timeinfo);
 
         paragon << "\n";
         paragon << ".==================================." << "\n";
@@ -98,7 +103,6 @@ int main(int argc, char * argv[]) {
         paragon << "|    Paragon fiskalny nr:  " << left << setw(8) << randomTime(10000) << "|\n";
         paragon << "|    ID kasy: " << left << setw(21) << getpid() << "|\n";
         paragon << "|    Kasa samoobslugowa nr: " << left << setw(7) << klient.nrKasy << "|\n";
-        paragon << "|    Data: " << left << setw(24) << bufor_czasu << "|\n";
         paragon << "|----------------------------------|" << "\n";
         paragon << "| Towar                    Wartosc |" << "\n";
         paragon << "|                                  |" << "\n";
@@ -261,6 +265,11 @@ int main(int argc, char * argv[]) {
             continue;
         }
         
+        struct tm timeinfo;
+        pobierz_aktualny_czas(&timeinfo);
+        char bufor_czasu[80];
+        strftime(bufor_czasu, 80, "%H:%M:%S %d.%m.%Y", &timeinfo);
+
         paragon << "|----------------------------------|" << "\n";
         paragon << "|                                  |" << "\n";
         paragon << "| " << left << setw(10) << "Suma PLN" << right << setw(19) << suma << " zl |\n";
@@ -272,6 +281,7 @@ int main(int argc, char * argv[]) {
         paragon << "| Klient:   " << left << setw(23) << klient.klient_id << "|\n";
         paragon << "| KARTA:    " << left << setw(23) << "VISA CONTACTLESS" << "|\n";
         paragon << "| NR KARTY: ************" << left << setw(11) << (1000 + rand() % 9000) << "|\n";
+        paragon << "| Data: " << left << setw(27) << bufor_czasu << "|\n";
         paragon << "|                                  |\n";
         paragon << "| SPRZEDAZ                         |\n";
         paragon << "| KOD AUT.: " << left << setw(23) << (100000 + rand() % 900000) << "|\n";

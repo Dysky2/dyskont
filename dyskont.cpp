@@ -62,9 +62,11 @@ int main() {
         showError("[DYSKONT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
         exit(EXIT_FAILURE);
     }
+    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
     stan_dyskontu->sredni_czas_obslugi[0] = CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA;
     stan_dyskontu->sredni_czas_obslugi[1] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
     stan_dyskontu->sredni_czas_obslugi[2] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
+    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
 
     stan_dyskontu->pid_dyskontu = getpid();
     for(int i=0; i<8; i++) {
@@ -134,7 +136,9 @@ int main() {
             "Blad wywolania execa"
         );
     }
+    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
     obsluga_id = opid;
+    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
 
     // Tworze wszytkie kasy i zostawiam otwarte tylko 3 samoobslugowe
     for (int i=0;i<8;i++) {
@@ -155,12 +159,16 @@ int main() {
                 );
             } else {
                 if( i < startowa_ilosc_kas) {
+                    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                     stan_dyskontu->pid_kasy[i] = pid;
                     stan_dyskontu->status_kasy[i]= 1;
+                    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                     ilosc_otwratych_kas++;
                 } else {
+                    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                     stan_dyskontu->pid_kasy[i] = pid;
                     stan_dyskontu->status_kasy[i]= 0;
+                    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                 }
             }
         } else {
@@ -179,18 +187,20 @@ int main() {
                     "Blad wywolania execa"
                 );
             } else {
+                operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                 stan_dyskontu->pid_kasy[i] = pid;
                 stan_dyskontu->status_kasy[i] = 0;
+                operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
             }
         }
     }
     sleep(1);
 
     ListaKlientow * lista_klientow = new ListaKlientow(dane_klientow, 1);
-    int ilosc_klientow = 0;
     while( time(NULL) < dyskont_koniec && !ewakuacja) {
 
         while(dane_klientow->ilosc > MAX_ILOSC_KLIENTOW - 2 && dane_klientow->ilosc < MAX_ILOSC_KLIENTOW) {
+            if(ewakuacja) break;
             sleep(1);
         }
 
@@ -221,88 +231,167 @@ int main() {
             operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
         }
 
+        operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+        int dlugosc_koleki = stan_dyskontu->dlugosc_kolejki[ID_KASY_SAMOOBSLUGOWEJ];
+        int status_stac_1 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1];
+        operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
         // otwarcie kasy stacjonarnej 1
-        if(stan_dyskontu->dlugosc_kolejki[0] > 3 && stan_dyskontu->status_kasy[6] == 0) {
-            stan_dyskontu->status_kasy[6] = 1;
+        if(dlugosc_koleki > 3 && status_stac_1 == 0) {
+
+            operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+            stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 1;
+            operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
             operacja_v(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
-            kill(stan_dyskontu->pid_kasy[6], SIGUSR2);
+
+            kill(stan_dyskontu->pid_kasy[ID_KASY_STACJONARNEJ_1], SIGUSR2);
         }
 
-        // 5 10 15
         operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        int ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
-        if(ilosc_klientow < 5 * (ilosc_otwratych_kas - 3)) {
-            komunikat << "[DYSKONT] ZAMYKAM KASE " << "\n" << "\n";
-            for(int i=6;i> 0;i--) {
+        if(ilosc_klientow < LICZBA_KLIENTOW_NA_KASE * (ilosc_otwratych_kas - 3)) {
+            for(int i = 5;i > 2;i--) {
                 if(stan_dyskontu->status_kasy[i] == 1) {
-                    Klient klient = {1, stan_dyskontu->pid_kasy[i], 0,0,-1,0};
-                    stan_dyskontu->status_kasy[i]=0;
+                    komunikat << "[DYSKONT] ZAMYKAM KASE " << i + 1 << "\n";
 
+                    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                    stan_dyskontu->status_kasy[i] = 0;
+                    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                    kill(stan_dyskontu->pid_kasy[i], SIGUSR2);
                     operacja_p(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
-                    msgsnd(msqid_kolejka_samo, &klient, sizeof(klient)-sizeof(long), 0);
                     ilosc_otwratych_kas--;
-                    
                     break;
                 }
             }
         }
 
-        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
-        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-
         // 15 20 25
-        if (ilosc_klientow >= ilosc_otwratych_kas * 5 && ilosc_otwratych_kas <= 5) {
-
+        if (ilosc_klientow >= ilosc_otwratych_kas * LICZBA_KLIENTOW_NA_KASE && ilosc_otwratych_kas <= 5) {
             int wolny_status = -1;
-            for(int i =0;i <6;i++) {
-                if (stan_dyskontu->status_kasy[i] == 0) {
+            for(int i = 0;i < 6;i++) {
+                operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                int status_kasy = stan_dyskontu->status_kasy[i];
+                operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                if (status_kasy == 0) {
                     wolny_status = i;
                     break;
                 }
             }
             if(wolny_status != -1) {
-                ilosc_otwratych_kas++;
+                komunikat << "[DYSKONT] OTWIERAM KASE " << wolny_status + 1 << "\n";
+                
+                operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                 stan_dyskontu->status_kasy[wolny_status] = 1;
+                operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                
+                ilosc_otwratych_kas++;
+
                 operacja_v(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
                 kill(stan_dyskontu->pid_kasy[wolny_status], SIGUSR1);
             }
         }
+
         stringstream semafory;
         semafory << "[DYSKONT] Semafory: ";
-        for(int i=0;i<8;i++) {
+        operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+        for(int i=0;i<ILOSC_SEMAFOROW;i++) {
             semafory << semctl(dyskont_sem_id, i, GETVAL) << " ";
         }
+        operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
         komunikat << semafory.str() << "\n";
         semafory.clear();
 
-        komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[0] << "\n";
-        komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[1] << "\n";
-        komunikat << "[DYSKONT] Ilosc ludzi w kolejce " << stan_dyskontu->dlugosc_kolejki[2] << "\n";
+        stringstream kolejki;
+        kolejki << "[DYSKONT] Ilosc ludzi w kolejce ";
+        operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+        for(int i=0; i < ILOSC_KOLJEJEK; i++) {
+            kolejki << stan_dyskontu->dlugosc_kolejki[i] << " ";
+        }
+        operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);   
+        komunikat << kolejki.str() << "\n";
+        kolejki.clear();
     }
 
+    if(ewakuacja) {
+        komunikat << "[DYSKONT] Kierownik zarzadzil zamkniecie dyskontu\n";
+    }
+
+    operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+    int ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+    operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
     // czekanie az klienci opuszcza sklep
-    while (semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) > 0) {
+    while (ilosc_klientow > 0) {
+
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
+        if(ilosc_klientow < LICZBA_KLIENTOW_NA_KASE * (ilosc_otwratych_kas - 3)) {
+            for(int i = 5;i > 2;i--) {
+                if(stan_dyskontu->status_kasy[i] == 1) {
+                    komunikat << "[DYSKONT] ZAMYKAM KASE " << i + 1 << "\n";
+                    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                    stan_dyskontu->status_kasy[i] = 0;
+                    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                    kill(stan_dyskontu->pid_kasy[i], SIGUSR2);
+                    operacja_p(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
+                    ilosc_otwratych_kas--;
+                    break;
+                }
+            }
+        }
 
         if(ewakuacja) {
-            for(int i =0;i<8;i++) {
+            for(int i=0;i<8;i++) {
+                operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                 if(stan_dyskontu->status_kasy[i] != 0) {
                     stan_dyskontu->status_kasy[i] = 0;
                     kill(stan_dyskontu->pid_kasy[i], SIGUSR2);
                 }
+                operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
             }
             
-            for(int i=0;i < dane_klientow->ilosc;i++) {
+            int kopia_pidow[MAX_ILOSC_KLIENTOW];
+            int kopia_ilosc = 0;
+
+            operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+            kopia_ilosc = dane_klientow->ilosc;
+            for(int i=0; i < kopia_ilosc; i++) {
+                kopia_pidow[i] = dane_klientow->lista_klientow[i];
+            }
+            operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
+            for(int i=0; i < kopia_ilosc; i++) {
+                if(kopia_pidow[i] > 0) {
+                    kill(kopia_pidow[i], SIGTERM);
+                }
                 usleep(1000);
-                int pid_do_ubica = dane_klientow->lista_klientow[i];
-                if(pid_do_ubica > 0) kill(pid_do_ubica, SIGTERM);
             }
         }
 
-        komunikat << "[DYSKONT] Zostalo: " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << " klientow w dyskoncie" << "\n";
         sleep(2);
+        
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        komunikat << "[DYSKONT] Zostalo: " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << " klientow w dyskoncie" << "\n";
+        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+    }
+
+    // Kierownik opusza dyskont
+    if(stan_dyskontu->pid_kierownika > 0) {
+        int kill_status_kierownik = kill(stan_dyskontu->pid_kierownika, SIGTERM);
+        if(kill_status_kierownik == -1) {
+            if(errno != ESRCH) {
+                showError("Blad wyslania SIGTERM do obslugi");
+            }
+        }
     }
 
     // Zakonczenie działania obłsugi
@@ -321,16 +410,6 @@ int main() {
         int wynik = kill(stan_dyskontu->pid_kasy[i], SIGTERM);
 
         if(wynik == -1) {
-            if(errno != ESRCH) {
-                showError("Blad wyslania SIGTERM do obslugi");
-            }
-        }
-    }
-
-    // Kierownik opusza dyskont
-    if(stan_dyskontu->pid_kierownika > 0) {
-        int kill_status_kierownik = kill(stan_dyskontu->pid_kierownika, SIGTERM);
-        if(kill_status_kierownik == -1) {
             if(errno != ESRCH) {
                 showError("Blad wyslania SIGTERM do obslugi");
             }

@@ -47,6 +47,14 @@
     * Opis: Podczas trwania symulacji, zostanie wysłany sygnał SIGINT (CTRL + C)
     * Oczekiwany rezultat: Symulacja powinna poprawnie usunac wszystkie zasoby, z których korzystała
     * Wynik: [**Zaliczony**] 
+* **Test 6 (Waga towaru)**:
+    * Opis: Może zdarzyć się sytuacja w której waga towaru nie zgadza się z produktem który klient dostarczył
+    * Oczekiwany rezultat: Obługa podejdzie do kasy zgłaszającej błąd i odblokuję kasę, aby klient mógł dokończyć zakupy
+    * Wynik: [**Zaliczony**] 
+* **Test 7 (Sygnał ewakuacji)**:
+    * Opis: Kierownik zarządza ewakuację całego dyskontu 
+    * Oczekiwany rezultat: Klienci opuszczają dyskont bez robienia zakupów, następnie zamykane są wszystkie kasy
+    * Wynik: [**Zaliczony**]
 
 ## Wymagana funkcje systemowe i linki do kodu
 
