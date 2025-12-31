@@ -55,13 +55,13 @@ int main() {
     // Tworze pamiec dzielona dla stanu calego dyskontu
     shmId_kasy = checkError( shmget(utworz_klucz('C'), sizeof(StanDyskontu), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej");
 
-    // Ustawienie wartosci semafora odrazu na ilosc_kas_startowych 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmId_kasy, NULL, 0);
 
     if(stan_dyskontu == (void*) -1) {
         showError("[DYSKONT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
         exit(EXIT_FAILURE);
     }
+
     operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
     stan_dyskontu->sredni_czas_obslugi[0] = CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA;
     stan_dyskontu->sredni_czas_obslugi[1] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
@@ -252,6 +252,7 @@ int main() {
         int ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
+        // Zamknięcie kasy samoobsługowej w zależności od ilości klientów
         if(ilosc_klientow < LICZBA_KLIENTOW_NA_KASE * (ilosc_otwratych_kas - 3)) {
             for(int i = 5;i > 2;i--) {
                 if(stan_dyskontu->status_kasy[i] == 1) {
@@ -269,7 +270,7 @@ int main() {
             }
         }
 
-        // 15 20 25
+        // Otwarcie kasy samoobsługowej w zależności od ilości klientów
         if (ilosc_klientow >= ilosc_otwratych_kas * LICZBA_KLIENTOW_NA_KASE && ilosc_otwratych_kas <= 5) {
             int wolny_status = -1;
             for(int i = 0;i < 6;i++) {
@@ -332,6 +333,7 @@ int main() {
         ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
+        // Otwarcie kasy samoobsługowej w zależności od ilości klientów
         if(ilosc_klientow < LICZBA_KLIENTOW_NA_KASE * (ilosc_otwratych_kas - 3)) {
             for(int i = 5;i > 2;i--) {
                 if(stan_dyskontu->status_kasy[i] == 1) {

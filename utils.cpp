@@ -338,6 +338,7 @@ int Kolejka::czy_oplaca_sie_zmienic_kolejke(int pid_klienta, int aktualny_nr_kol
     if(pozycja == -1) return -1;
 
     float najkrotszy_czas = pozycja * stan_dyskontu->sredni_czas_obslugi[aktualny_nr_kolejki];
+    int czas_zmiany = 10;
 
     float czas_kolejki_do_ktorej_chce_przejsc = -1;
     int najepszy_wybor = -1;
@@ -348,7 +349,7 @@ int Kolejka::czy_oplaca_sie_zmienic_kolejke(int pid_klienta, int aktualny_nr_kol
 
             czas_kolejki_do_ktorej_chce_przejsc = stan_dyskontu->sredni_czas_obslugi[nr_koleki] * stan_dyskontu->dlugosc_kolejki[nr_koleki];
 
-            if(stan_dyskontu->status_kasy[i] == 1 && (czas_kolejki_do_ktorej_chce_przejsc + 10 < najkrotszy_czas)) {
+            if(stan_dyskontu->status_kasy[i] == 1 && (czas_kolejki_do_ktorej_chce_przejsc + czas_zmiany < najkrotszy_czas)) {
                 najkrotszy_czas = czas_kolejki_do_ktorej_chce_przejsc;
                 najepszy_wybor = nr_koleki;
             }
@@ -358,7 +359,7 @@ int Kolejka::czy_oplaca_sie_zmienic_kolejke(int pid_klienta, int aktualny_nr_kol
     else if(aktualny_nr_kolejki == 1) {
         czas_kolejki_do_ktorej_chce_przejsc = stan_dyskontu->sredni_czas_obslugi[2] * stan_dyskontu->dlugosc_kolejki[2];
 
-        if(stan_dyskontu->status_kasy[7] == 1 && (czas_kolejki_do_ktorej_chce_przejsc + 10 < najkrotszy_czas) ) {
+        if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 1 && (czas_kolejki_do_ktorej_chce_przejsc + czas_zmiany < najkrotszy_czas) ) {
             najkrotszy_czas = czas_kolejki_do_ktorej_chce_przejsc;
             najepszy_wybor = 2;
         }
@@ -372,7 +373,7 @@ int Kolejka::czy_oplaca_sie_zmienic_kolejke(int pid_klienta, int aktualny_nr_kol
         }
 
         czas_kolejki_do_ktorej_chce_przejsc = stan_dyskontu->sredni_czas_obslugi[0] * stan_dyskontu->dlugosc_kolejki[0];
-        if(jest_samooboslugowa && (czas_kolejki_do_ktorej_chce_przejsc + 10 < najkrotszy_czas)) {
+        if(jest_samooboslugowa && (czas_kolejki_do_ktorej_chce_przejsc + czas_zmiany < najkrotszy_czas)) {
             najkrotszy_czas = czas_kolejki_do_ktorej_chce_przejsc;
             najepszy_wybor = 0;
         }

@@ -24,7 +24,48 @@
 *   **Logika klientów**: Klienci nie są tylko tłem – faktycznie reagują na sytuację w sklepie. Gdy otwiera się nowa kasa lub inna kolejka idzie szybciej, proces klienta przelicza opłacalność i zmienia kolejkę.
 *   **Scenariusze obsługi**: Poprawnie zaimplementowano komunikację dwukierunkową między kasą a obsługą. Gdy Klient próbuje kupić alkohol przy kasie samoobsługowej, wzywana jest obsługa aby sprawdzić jego wiek.
 *   **Osobne okno kierownika**: Poprzez wykorzystanie `tmuxa` można zarządzać panelem kierownika w jednym terminalu.
+* **Walidacja wejścia:** W procesie Kierownika zaimplementowano sprawdzanie danych wprowadzanych z klawiatury. Program sprawdza, czy wpisana opcja jest liczbą, czy numer wybranej kasy jest poprawny oraz czy użytkownik nie próbuje otworzyć już otwartej kasy.
 *   **Czytelne logi**: Zastosowałem `AtomicLogger` z semaforem aby bez race conditions wypisywać komunikaty na ekran i do pliku, zgodne z kolejnościa wykonania.
+
+## Problemy napotkane w projektcie i rozwiązania:
+*  **Procesy zombie**: Poprzez dużą ilość kończących się procesów klientów, tworzyły się procesy zombie. Rozwiązałem to poprzez obsłużeniu sygnału `SIGCHLD` który wywoływał `waitpid` w dyskoncie.
+* **Algorytm zmiany kolejki**: Dość czasochłonne było wymyślenie algorytmu decyzji klienta do której kasy powienen podejść. Teraz klient na podstawie ilosci klientów i czasu ile by zajeło mu obsłużenie przy danej kasie, podejmuje najlepsza decyzje, i zmienia ją w zależności od sytuacji przy kasach.
+
+## Pseudokod algorytmu zmiany kolejki:
+
+```
+FUNKCJA czy_oplaca_sie_zmienic_kolejke(pidKlienta, nrKolejki):
+    pozycja = znajdz_moja_pozycje_w_kolejce(pidKlienta, nrKolejki)
+
+    JEŚLI pozycja == -1 TO
+        ZWRÓĆ -1
+
+    najkrotszy_czas = pozycja * sredni_czas_obslugi[nrKolejki]
+    czas_zmiany = 10
+
+    JEŚLI jestem przy kasie samoobsługowej TO
+        DLA KAŻDEJ kasy stacjonarnej i (od 1 do 2) WYKONAJ:
+            czas_nowej_kolejki = sredni_czas_obslugi[i] * dlugosc_kolejki[i]
+            
+            JEŚLI (kasa[i] jest otwarta) ORAZ (czas_nowej_kolejki + czas_zmiany < najkrotszy_czas) TO:
+                najkrotszy_czas = czas_nowej_kolejki
+                najlepszy_wybor = i
+
+    W PRZECIWNYM RAZIE JEŚLI aktualny_nr_kolejki == 1 TO:
+        czas_kolejki_2 = sredni_czas_obslugi[2] * dlugosc_kolejki[2]
+        JEŚLI (kasa_nr_7 jest otwarta) ORAZ (czas_kolejki_2 + czas_zmiany < najkrotszy_czas) TO:
+            najkrotszy_czas = czas_kolejki_2
+            najlepszy_wybor = 2
+
+        JEŚLI przynajmniej jedna kasa samoobsługowa jest otwarta TO:
+            czas_samoobslugi = sredni_czas_obslugi[0] * dlugosc_kolejki[0]
+            JEŚLI (czas_samoobslugi + czas_zmiany < najkrotszy_czas) TO:
+                najkrotszy_czas = czas_samoobslugi
+                najlepszy_wybor = 0
+
+    ZWRÓĆ najlepszy_wybor
+KONIEC FUNKCJI
+```
 
 ## Testy
 * **Test 1 (Obciążenie)**: 
@@ -59,37 +100,37 @@
 ## Wymagana funkcje systemowe i linki do kodu
 
 #### A. Tworzenie i obsługa plików:
-* `open()`: []
-* `close()`: []
-* `write()`: []
+* `open()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L184]
+* `close()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L198]
+* `write()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L191]
 
 #### B. Tworzenie procesów: 
-* `fork()`: []
-* `execl()`: []
-* `exit()`: []
-* `wait()`: []
+* `fork()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L213]
+* `execl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L216]
+* `exit()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L314]
+* `wait()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L420]
 
 #### C. Obsluga sygnałów:
-* `kill()`: []
-* `signal()`: []
+* `kill()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kierownik.cpp#L166]
+* `signal()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L27]
 
 #### D. Synchronizacja procesów:
-* `ftok()`: []
-* `semget()`: []
-* `semctl()`: []
-* `semop()`: []
+* `ftok()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L40]
+* `semget()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L46]
+* `semctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L58]
+* `semop()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L74]
 
 #### E. Segmenty pamięci dzielonej:
-* `shmget()`: []
-* `shmat()`: []
-* `shmdt()`: []
-* `shmctl()`: []
+* `shmget()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp?plain=1#L56]
+* `shmat()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L59]
+* `shmdt()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L313]
+* `shmctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L438]
 
 #### F. Kolejki komunikatów:
-* `msgget()`: []
-* `msgsnd()`: []
-* `msgrcv()`: []
-* `msgctl()`: []
+* `msgget()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L81]
+* `msgsnd()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasjer.cpp#L197]
+* `msgrcv()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L80]
+* `msgctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L440]
 
 #### G. Obsługa błedów:
-* `perror()`: []
+* `perror()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L18]
