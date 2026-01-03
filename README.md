@@ -6,35 +6,59 @@
 ```
 Skrypt start.sh automatycznie kompiluje projekt (przy użyciu Makefile) i uruchamia symulację.
 
-## Założenia projektu:
-* **Architektura wieloprocesowa**: Zgodnie z wymaganiami projekt unika rozwiązań scentralizowanych, jest on oparty na `fork()` i `exec()`
-* **Komunikacja**: Wykorzystano mechanizmy komunikacji Systemu V takie jak kolejki komunikatów i pamięć dzielona, ustawiając na nich minimalne prawa dostępu.
-* **Bezpieczeństwo**: Wszystkie dane wejściowe są walidowane. Błędy systemowe są obsługiwane przez `perror()` i `errno`
+## 1. Założenia projektu:
+
+Celem projektu było stworzenie wieloprocesowej symulacji działania dyskontu, w środowisku systemu Linux.
+
+**Główne założenia:**
+* **Architektura wieloprocesowa**: Zgodnie z wymaganiami projekt unika rozwiązań scentralizowanych. Każdy element (Klient, Kasa, Obsługa) jest oparty na `fork()` i `exec()` co oznacza, że jest osobnym procesem.
+* **Komunikacja**: Wykorzystano mechanizmy komunikacji Systemu V takie jak kolejki komunikatów czy pamięć dzielona, ustawiając na nich minimalne prawa dostępu.
+* **Bezpieczeństwo**: Wszystkie dane wejściowe są walidowane. Błędy systemowe są obsługiwane przez `perror()` i `errno`.
 * **Zarządzanie zasobami**: Projekt rozdziela logikę systemową od struktur. Gwarantuje również sprzątanie zasobów przy zamknięciu symulacji.
 
-## Opis ogólny kodu:
-* **Proces główny (Dyskont)**: Inicjalizuje zasoby systemowe (segmenty SHM, grupy semaforów, kolejki MSQ), odpowiada za generowanie procesów klientów oraz końcowe sprzątanie zasobów.
-* **Proces Klienta**: Symuluje zachowanie konsumenta: wybiera produkty, oblicza potencjalny czas oczekiwania i podejmuje decyzję o zmianie kolejki do kasy o mniejszym obciążeniu.
-* **Proces Kasy**: Modeluje kasę samoobsługową. Pobiera dane o produktach przez kolejki MSQ i komunikuje się z procesem obsługi w sytuacjach spornych (weryfikacja wieku, błędy wagi).
-* **Proces Kasjera**: Proces obsługujący kasy stacjonarne, reagujący na polecenia Kierownika oraz sygnały systemowe.
-* **Proces Obsługi**: Proces pomocniczy, który na wezwanie kasy symuluje podejście do stanowiska i rozwiązanie problemu (np. zatwierdzenie wieku klienta).
-* **Proces Kierownika**: Osobny interfejs sterujący (uruchamiany w tmux), umożliwiający użytkownikowi ręczne zarządzanie stanem dyskontu (otwieranie kas, ewakuacja).
+## 2. Opis ogólny kodu:
+#### Pliki Źródłowe:
+1.  **`dyskont.cpp`:**
+    * Inicjalizuje zasoby systemowe (segmenty SHM, grupy semaforów, kolejki MSQ).
+    * Uruchamia procesy potomne kasy, obsługę, kierownika.
+    * Generuje procesy klientów w losowym czasie.
+    * Zarządza dynamicznie kasami, które trzeba otworzyć a które zamknąć.
+    * Odpowiada za wyczyszczenie zasobów po zakończeniu.
+2.  **`klient.cpp`:**
+    * Generuje listę zakupów (losowe produkty z bazy).
+    * Podejmuje decyzję o wyborze kolejki (algorytm `czy_oplaca_sie_zmienic_kolejke`).
+    * Wysyła strukturę z zakupami do odpowiedniej kolejki komunikatów (kasy).
+    * Obsługuje logikę "niecierpliwości" – sprawdza, czy opłaca się zmienić kolejkę.
+3.  **`kasa.cpp`:**
+    * Odbiera komunikaty od klientów.
+    * Symuluje skanowanie produktów.
+    * Wzywa obsługę w razie potrzeby (Awaria wagi, weryfikacja wieku).
+    * Generuje paragon dla klienta.
+4.  **`kasjer.cpp`:**
+    * Działa podobnie do kasy samoobsługowej, ale obsługiwana przez pracownika.
+    * Może zostać zamknięta przez Kierownika.
+5.  **`obsluga.cpp`:**
+    * Odbiera zgłoszenia od kas, symuluje podejście i rozwiązanie problemu.
+6.  **`kierownik.cpp`:**
+    * Proces umożliwiający użytkownikowi ręczne zarządzanie stanem dyskontu (otwieranie kas, ewakuacja).
+7.  **`utils.cpp` i `utils.h`:**
+    * Biblioteka funkcji pomocniczych
+    * Definicje struktur danych 
 
-## Co udało się zrobić:
-* **Stabilna symulacja**: Zrealizowana wszystkie wymagania projekowe. Program stabilnie obsługuje kilkadziesiąt procesów naraz.
-* **Logika klientów**: Klienci reagują na sytuację w sklepie. Gdy otwiera się nowa kasa lub inna kolejka idzie szybciej, proces klienta przelicza opłacalność i zmienia kolejkę.
-* **Scenariusze obsługi**: Poprawnie zaimplementowano komunikację dwukierunkową między kasą a obsługą. Gdy Klient próbuje kupić alkohol przy kasie samoobsługowej, wzywana jest obsługa aby sprawdzić jego wiek.
-* **Osobne okno kierownika**: Wykorzystanie `tmuxa` pozwoliło na podział jednego terminala na parę okien, separując sterowanie Kierownika od logów.
-* **Walidacja wejścia:** W procesie Kierownika zaimplementowano sprawdzanie danych wprowadzanych z klawiatury. Program sprawdza, czy wpisana opcja jest liczbą, czy numer wybranej kasy jest poprawny oraz czy użytkownik nie próbuje otworzyć już otwartej kasy.
-* **Czytelne logi**: Zastosowałem `AtomicLogger` z semaforem aby bez race conditions wypisywać komunikaty na ekran i do pliku, zgodnię z kolejnością wykonania.
-* **Rozróżnianie Logów**: Dodałem kolorowanie wyjścia na ekran, aby łatwiej było rozróżnić procesy.
+## 3. Szczegółowy opis implementacji i algorytmów wraz z pseudokodem
 
-## Problemy napotkane w projekcie i rozwiązania:
-* **Procesy zombie**: Poprzez dużą ilość kończących się procesów klientów, tworzyły się procesy zombie. Rozwiązałem to poprzez obsłużenie sygnału `SIGCHLD` który wywoływał `waitpid` w dyskoncie.
-* **Algorytm zmiany kolejki**: Dość czasochłonne było wymyślenie algorytmu decyzji klienta do której kasy powinien podejść. Teraz klient na podstawie ilości klientów i czasu ile by zajełoby mu obsłużenie przy danej kasie, podejmuje najlepsza decyzje, i zmienia ją w zależności od sytuacji przy kasach.
+### 3.1 Mechanizmy synchronizacji i IPC
+* **Pamięć dzielona:** Przechowuje dane np. w obiekcie `StanDyskontu`, który zawiera tablice PID-ów kas, statusy tych kas oraz długość kolejek.
+* **Semafory:** Zestaw semaforów chronią sekcję krytyczną oraz służą do prawidłowej synchronizacji wyjścia na ekran (`SEMAFOR_OUTPUT`).
+* **Kolejka komunikatów:** Służą do przekazania informacji klientów do kas oraz do komunikacji między kasami a obsługą (wezwanie pomocy).
 
-## Pseudokod algorytmu zmiany kolejki:
+### 3.2 Algorytm Klienta
+Klient nie wybiera kolejki losowo. Algorytm `czy_oplaca_sie_zmienic_kolejke` podejmuje decyzje w oparciu o aktualną sytuację przy kasach:
+1. Klient oblicza szacowany czas potrzebny w obecnej kolejce (pozycja * sredni_czas_obslugi)
+2. Sprawdza jakie kasy inne są otwarte
+3. Jeżeli `(czas_kolejki_do_ktorej_chce_przejsc + koszt_zmiany) < obecny_czas`, wtedy klient usuwa się z obecnej kolejki i przechodzi do nowej (aktualizując przy tym pamięć dzieloną).
 
+#### Pseudokod algorytmu zmiany kolejki:
 ```
 FUNKCJA czy_oplaca_sie_zmienic_kolejke(pidKlienta, nrKolejki):
     pozycja = znajdz_moja_pozycje_w_kolejce(pidKlienta, nrKolejki)
@@ -61,7 +85,7 @@ FUNKCJA czy_oplaca_sie_zmienic_kolejke(pidKlienta, nrKolejki):
 
         JEŚLI przynajmniej jedna kasa samoobsługowa jest otwarta TO:
             czas_nowej_kolejki = sredni_czas_obslugi[0] * dlugosc_kolejki[0]
-            JEŚLI (kasa_samoobslugowa jest otwara) ORAZ (czas_nowej_kolejki + czas_zmiany < najkrotszy_czas) TO:
+            JEŚLI (kasa_samoobslugowa jest otwarta) ORAZ (czas_nowej_kolejki + czas_zmiany < najkrotszy_czas) TO:
                 najkrotszy_czas = czas_nowej_kolejki
                 najlepszy_wybor = 0
 
@@ -69,37 +93,61 @@ FUNKCJA czy_oplaca_sie_zmienic_kolejke(pidKlienta, nrKolejki):
 KONIEC FUNKCJI
 ```
 
-## Testy
+### 3.3 Obsługa błędów
+Zgodnie z wymaganiami, zaimplementowano własne funkcje do obsługi błędów:
+*  Funkcja `checkError(int result, const char * msg)` sprawdza wynik wywołania danej funkcji systemowej, pod polem `result`. Jeśli zwróci ona `-1`, wypisuje się wtedy błąd przy pomocy `perror()` z podanym komunikatem, i proces zostaje zakończony.
+* Dane wejściowe w `kierownik.cpp` są walidowane, aby zapobiec nieprawidłowemu wykonaniu (Podanie znaków zamiast cyfr).
+
+### 3.4. Synchronizacja wypisywania (AtomicLogger)
+Przy wielu procesach równoczesne pisanie na `stdout` powodowało "rozjeżdżanie się" tekstu. Zastosowano klasę AtomicLogger, która synchronizuje dostęp do terminala za pomocą semafora. Mechanizm działania opiera się na **semaforze** (`SEMAFOR_OUTPUT`), który chroni sekcję krytyczną odpowiedzialną za wypisanie danych. 
+
+Każdy proces:
+1. Proces przygotowuje komunikat w buforze.
+2. Blokuje dostęp do terminala (operacja `P` na semaforze).
+3. Wypisuje sformatowany komunikat (z sygnaturą czasową i odpowiednim kolorem) na ekran oraz do dedykowanego pliku logów.
+4. Zwalnia blokadę (operacja `V`), umożliwiając dostęp innym procesom.
+
+## 4. Problemy napotkane w projekcie i rozwiązania:
+* **Procesy zombie**: Poprzez dużą ilość kończących się procesów klientów, tworzyły się procesy zombie. Rozwiązałem to poprzez obsłużenie sygnału `SIGCHLD` który wywoływał `waitpid` w dyskoncie.
+* **Algorytm zmiany kolejki**: Dość czasochłonne było wymyślenie algorytmu decyzji klienta do której kasy powinien podejść. Teraz klient na podstawie liczby osób w kolejece i czasu potrzebnego na obsłużenie przy danej kasie, podejmuje najlepsza decyzje, i zmienia ją w zależności od sytuacji przy kasach.
+
+## 5. Elementy wyróżniające
+W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
+1. **Integracja z `tmux`:** Skrypt startowy `start.sh` oraz kod `dyskont.cpp` automatycznie dzielą okno terminala, uruchamiając panel Kierownika w osobnym podoknie obok logów symulacji.
+2. **Kolorowanie logów:** Zdefiniowano makra ANSI (np. `KOLOR_RED`, `KOLOR_GREEN`) w `utils.h`. Każdy typ procesu (Klient, Kasa, Kierownik) posiada swój unikalny kolor w logach, co poprawia przeglądanie wyników z ekranu.
+3. **Zaawansowany "Paragon":** Kasy generują sformatowany, realistycznie wyglądający paragon z losowymi numerami kart i sumą zakupów.
+
+## 6. Testy
 * **Test 1 (Obciążenie)**: 
     * Opis: Symulacja wpuszcza naraz 100 klientów w bardzo krótkim czasie.
     * Oczekiwany rezultat: System nie ulega awarii, dyskont poprawnie obsługuje każdego klienta, sprawdza czy żaden z limitów nie został przekroczony.
     * Wynik: [**Zaliczony**]
 * **Test 2 (Otwarcie kas)**: 
-    * Opis: Dyskont poprawnie otwiera wszystkie kasy zgodnie z ilością klientów w sklepie
-    * Oczekiwany rezultat: Po wejściu do sklepu 25 klientów dyskont powinien poprawnie otworzyć 7 kas (6 samoobsługowych i 1 stacjonarną)
+    * Opis: Dyskont poprawnie otwiera wszystkie kasy zgodnie z ilością klientów w sklepie.
+    * Oczekiwany rezultat: Po wejściu do sklepu 25 klientów dyskont powinien poprawnie otworzyć 7 kas (6 samoobsługowych i 1 stacjonarną).
     * Wynik: [**Zaliczony**]
 * **Test 3 (Weryfikacja wieku)**: 
-    * Opis: Klient kupujący alkohol, zostanie sprawdzony przez obsługę, czy ma do tego prawo
+    * Opis: Klient kupujący alkohol, zostanie sprawdzony przez obsługę, czy ma do tego prawo.
     * Oczekiwany rezultat: Jeżeli klient jest pełnoletni, alkohol zostanie mu sprzedany, jeśli nie, zostanie odstawiony na półkę.
     * Wynik: [**Zaliczony**]
-* **Test 4 (Zamkniecie kas)**: 
-    * Opis: Kierownik otwiera kase stacjonarna 2 od razu po otwarciu sie dyskontu
-    * Oczekiwany rezultat: Jeżeli przez 30 sekund nikt nie pojawi sie w kolejce do tej kasy, powinna się ona zamknąć
+* **Test 4 (Zamknięcie kas)**: 
+    * Opis: Kierownik otwiera kasę stacjonarną 2 od razu po otwarciu sie dyskontu.
+    * Oczekiwany rezultat: Jeżeli przez 30 sekund nikt nie pojawi sie w kolejce do tej kasy, powinna się ona zamknąć.
     * Wynik: [**Zaliczony**]
-* **Test 5 (Posprzatanie zasobów)**:
-    * Opis: Podczas trwania symulacji, zostanie wysłany sygnał SIGINT (CTRL + C)
-    * Oczekiwany rezultat: Symulacja powinna poprawnie usunac wszystkie zasoby, z których korzystała
+* **Test 5 (Posprzątanie zasobów)**:
+    * Opis: Podczas trwania symulacji, zostanie wysłany sygnał SIGINT (CTRL + C).
+    * Oczekiwany rezultat: Symulacja powinna poprawnie usunąć wszystkie zasoby, z których korzystała.
     * Wynik: [**Zaliczony**]
 * **Test 6 (Waga towaru)**:
-    * Opis: Może zdarzyć się sytuacja w której waga towaru nie zgadza się z produktem który klient dostarczył
-    * Oczekiwany rezultat: Obługa podejdzie do kasy zgłaszającej błąd i odblokuję kasę, aby klient mógł dokończyć zakupy
+    * Opis: Może zdarzyć się sytuacja w której waga towaru nie zgadza się z produktem który klient dostarczył.
+    * Oczekiwany rezultat: Obługa podejdzie do kasy zgłaszającej błąd i odblokuje kasę, aby klient mógł dokończyć zakupy.
     * Wynik: [**Zaliczony**]
 * **Test 7 (Sygnał ewakuacji)**:
-    * Opis: Kierownik zarządza ewakuację całego dyskontu 
-    * Oczekiwany rezultat: Klienci opuszczają dyskont bez robienia zakupów, następnie zamykane są wszystkie kasy
+    * Opis: Kierownik zarządza ewakuację całego dyskontu .
+    * Oczekiwany rezultat: Klienci opuszczają dyskont bez robienia zakupów, następnie zamykane są wszystkie kasy.
     * Wynik: [**Zaliczony**]
 
-## Wymagana funkcje systemowe i linki do kodu
+## 7. Wymagane funkcje systemowe i linki do kodu
 
 #### A. Tworzenie i obsługa plików:
 * `open()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L184]
@@ -134,5 +182,5 @@ KONIEC FUNKCJI
 * `msgrcv()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L80]
 * `msgctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L440]
 
-#### G. Obsługa błedów:
+#### G. Obsługa błędów:
 * `perror()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L18]
