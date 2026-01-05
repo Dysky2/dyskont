@@ -158,9 +158,15 @@ int main(int, char * argv[]) {
 
             operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
 
+            operacja_p(sem_id, aktualnyNr);
+            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+            kolejka->usun_z_kolejki(getpid(), aktualnyNr);
+            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+            operacja_v(sem_id, aktualnyNr);
+
             Klient klient = {1 , getpid(), aktualnyNr, 0, 0, 0};
             klient.wiek = randomTimeWithRange(8, 50);
-            int dlugosc_tekstu = generateProducts(&klient);
+            generateProducts(&klient);
 
             int id_statusu = 0;
             if(aktualnyNr == 1) id_statusu = ID_KASY_STACJONARNEJ_1;
@@ -171,13 +177,6 @@ int main(int, char * argv[]) {
             operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
             if(status_kasy != 1) {
-
-                operacja_p(sem_id, aktualnyNr);
-                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
-                kolejka->usun_z_kolejki(getpid(), aktualnyNr);
-                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
-                operacja_v(sem_id, aktualnyNr);
-
                 operacja_p(sem_id, 0);
                 operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                 kolejka->dodaj_do_kolejki(getpid(), 0);
@@ -193,14 +192,8 @@ int main(int, char * argv[]) {
                 continue;
             }
 
-            int status = msgsnd(aktualneId, &klient, sizeof(int) * 4 + dlugosc_tekstu, 0);
+            int status = msgsnd(aktualneId, &klient, sizeof(Klient) - sizeof(long int) , 0);
             if(status != -1) {
-                operacja_p(sem_id, aktualnyNr);
-                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
-                kolejka->usun_z_kolejki(getpid(), aktualnyNr);
-                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
-                operacja_v(sem_id, aktualnyNr);
-
                 komunikat << "[" << "KLIENT-" << getpid() << "] " << "Ide do kasy nr: " << aktualnyNr << "\n";
             } else {
                 operacja_v(sem_id, SEMAFOR_ILOSC_KAS);

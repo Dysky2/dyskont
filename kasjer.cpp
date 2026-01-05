@@ -57,15 +57,12 @@ int main(int, char * argv[]) {
         int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
         operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
-        if(status_kasy == 0) {
-            if(pobierz_ilosc_wiadomosci(id_kasy) < 0) {
-            } else {
-                sleep(1);
-                continue;
-            }
-        } 
+        int wiadomosci_w_kolejce = pobierz_ilosc_wiadomosci(id_kasy);
 
-        komunikat << "[KASJER-" << getpid() << "]" << " Zaczynam dzialanie \n";
+        if(status_kasy == 0 && wiadomosci_w_kolejce == 0) {
+            sleep(1);
+            continue;
+        }
 
         Klient klient;
         memset(&klient, 0, sizeof(Klient));
@@ -101,7 +98,7 @@ int main(int, char * argv[]) {
 
         komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
 
-        sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW - 2));
+        sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW / simulation_speed));
 
         if(!czy_kasa_otwarta) continue;
         
@@ -194,13 +191,22 @@ int main(int, char * argv[]) {
         if(kill(klient.klient_id, 0) == 0) {
             klient.mtype = klient.klient_id;
             klient.ilosc_produktow = klient.ilosc_produktow - ile_produktow_odlozonych;
-            msgsnd(id_kasy, &klient, sizeof(Klient) - sizeof(long int), 0);
+
+            while (msgsnd(id_kasy, &klient, sizeof(Klient) - sizeof(long int), IPC_NOWAIT) == -1) {
+                if (errno == EAGAIN || errno == EINTR) {
+                    usleep(100000);
+                    if (!czy_kasa_otwarta) break; 
+                } else {
+                    showError("Błąd wysyłania paragonu w kasjerze");
+                    break;
+                }
+            }
         }
 
     }
 
     komunikat << "[KASJER-" << getpid() << "]" << " Zamykam kase stacjonarna" << "\n";
 
-    checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu" );
+    checkError( shmdt(stan_dyskontu), "Blad odlaczenia pamieci stanu w kasjerze" );
     exit(0);
 }

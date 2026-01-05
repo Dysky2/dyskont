@@ -204,7 +204,7 @@ int main() {
             sleep(1);
         }
 
-        sleep(randomTime(3 / simulation_speed));
+        sleep(randomTime(CZAS_WPUSZANIA_NOWYCH_KLIENTOW / simulation_speed));
 
         if (time(NULL) >= dyskont_koniec || ewakuacja) {
             break;

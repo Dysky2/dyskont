@@ -41,7 +41,7 @@
 
 // -- DEFINICJE MAKSYMALNYCH WARTOSCI --
 
-#define MAX_DATA_SIZE 512
+#define MAX_DATA_SIZE 256
 #define MAX_ILOSC_KLIENTOW 100
 
 // -- DEFINICJE DLA STRUKTURY DYSKONTU --
@@ -61,7 +61,9 @@
 // -- CZAS AKTYWNOSCI --
 
 #define CZAS_KASOWANIA_PRODUKTOW 4
-#define CZAS_ROBIENIA_ZAKUPOW 20
+#define CZAS_ROBIENIA_ZAKUPOW 6
+#define CZAS_WPUSZANIA_NOWYCH_KLIENTOW 3
+#define CZAS_DZIALANIA_OBSLUGI 7
 
 // -- SEMAFORY --
 
@@ -132,7 +134,7 @@ void ustaw_nazwe_katalogu(std::string nazwa);
 struct StanDyskontu {
     int pid_kasy[ILOSC_KAS];
     int status_kasy[ILOSC_KAS]; // 0 -> kasa zamknieta 1 -> kasa otwarta 2-> kasa w stanie opruznniania
-    int kolejka_klientow[ILOSC_KOLJEJEK][MAX_DLUGOSC_KOLEJEK];
+    int kolejka_klientow[ILOSC_KOLJEJEK][MAX_ILOSC_KLIENTOW];
     int dlugosc_kolejki[ILOSC_KOLJEJEK]; // 0 -> kolejka do kasy samoobslugowej, 1 -> kolejka do kasy stacjonarnej 1, 2 -> kolejka do kasy stacjonarnej 2 
 
     float sredni_czas_obslugi[ILOSC_KOLJEJEK]; // 0 czas kasy samooblugowe, 1 -> czas kasy stacjonranerej_1, 2 -> czas kasy stacjonranerej_2

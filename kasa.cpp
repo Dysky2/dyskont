@@ -71,7 +71,7 @@ int main(int argc, char * argv[]) {
         int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
         operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
         if(status_kasy == 0) {
-            pause();
+            sleep(2);
             continue;
         }
 
@@ -88,7 +88,7 @@ int main(int argc, char * argv[]) {
 
         komunikat << "[KASA-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
         
-        sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW));
+        sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW / simulation_speed));
         
         if(!czy_kasa_otwarta) continue;
 
@@ -304,7 +304,16 @@ int main(int argc, char * argv[]) {
         if(kill(klient.klient_id, 0) == 0) {
             klient.mtype = klient.klient_id;
             klient.ilosc_produktow = klient.ilosc_produktow - ile_produktow_odlozonych;
-            msgsnd(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), 0);
+            
+            while (msgsnd(msqid_kolejka_samo, &klient, sizeof(Klient) - sizeof(long int), IPC_NOWAIT) == -1) {
+                if (errno == EAGAIN || errno == EINTR) {
+                    usleep(100000);
+                    if (!czy_kasa_otwarta) break; 
+                } else {
+                    showError("Błąd wysyłania paragonu w kasjerze");
+                    break;
+                }
+            }
         }
     }
     

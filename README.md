@@ -1,5 +1,15 @@
 # Projekt SO -- temat 16: Symulacja Dyskontu
 
+### Wersja i dystrybucje
+
+Distributor ID:     Ubuntu \
+Release:            22.04 \
+Virtualization:     wsl \
+Operating System:   Ubuntu 22.04.5 LTS \
+Kernel:             Linux 6.6.87.2-microsoft-standard-WSL2 \
+Architecture:       x86-64 \
+gcc version: 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04.2)
+
 ### Aby rozpocząć symulację, w katalogu projektu należy wykonać polecenie:
 ```bash
 ./start.sh
@@ -114,7 +124,7 @@ Każdy proces:
 ## 5. Elementy wyróżniające
 W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
 1. **Integracja z `tmux`:** Skrypt startowy `start.sh` oraz kod `dyskont.cpp` automatycznie dzielą okno terminala, uruchamiając panel Kierownika w osobnym podoknie obok logów symulacji.
-2. **Kolorowanie logów:** Zdefiniowano makra ANSI (np. `KOLOR_RED`, `KOLOR_GREEN`) w `utils.h`. Każdy typ procesu (Klient, Kasa, Kierownik) posiada swój unikalny kolor w logach, co poprawia przeglądanie wyników z ekranu.
+2. **Kolorowanie logów:** Zdefiniowano makra ANSI (np. `KOLOR_YELLOW`, `KOLOR_CYAN`) w `utils.h`. Każdy typ procesu (Klient, Kasa, Kierownik) posiada swój unikalny kolor w logach, co poprawia przeglądanie wyników z ekranu.
 3. **Zaawansowany "Paragon":** Kasy generują sformatowany, realistycznie wyglądający paragon z losowymi numerami kart i sumą zakupów.
 
 ## 6. Testy
@@ -157,8 +167,8 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
 #### B. Tworzenie procesów: 
 * `fork()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L213]
 * `execl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L216]
-* `exit()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L314]
-* `wait()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L420]
+* `exit()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L323]
+* `wait()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L422]
 
 #### C. Obsługa sygnałów:
 * `kill()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kierownik.cpp#L166]
@@ -172,15 +182,15 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
 
 #### E. Segmenty pamięci dzielonej:
 * `shmget()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp?plain=1#L56]
-* `shmat()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L59]
-* `shmdt()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L313]
-* `shmctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L438]
+* `shmat()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L58]
+* `shmdt()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L322]
+* `shmctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L440]
 
 #### F. Kolejki komunikatów:
 * `msgget()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L81]
-* `msgsnd()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasjer.cpp#L197]
+* `msgsnd()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasjer.cpp#L195]
 * `msgrcv()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/kasa.cpp#L80]
-* `msgctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L440]
+* `msgctl()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/dyskont.cpp#L442]
 
 #### G. Obsługa błędów:
 * `perror()`: [https://github.com/Dysky2/dyskont/blob/735b70726e22ca86215c7e4c9c6c99487f4b1d4e/utils.cpp#L18]
