@@ -64,6 +64,13 @@ void ustaw_poczatkowe_wartosci_semaforow(int semid) {
     checkError(semctl(semid, SEMAFOR_LISTA_KLIENTOW, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_LISTA_KLIENTOW");
     checkError(semctl(semid, SEMAFOR_OUTPUT, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_OUTPUT");
     checkError(semctl(semid, SEMAFOR_STAN_DYSKONTU, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_OUTPUT");
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_KASY_STAC1, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_KASY_STAC1");
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_KASY_STAC2, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_KASY_STAC2");
+    if( MAX_ILOSC_KLIENTOW <= 32767 ) {
+        checkError(semctl(semid, SEMAFOR_MAX_ILOSC_KLIENTOW, SETVAL, MAX_ILOSC_KLIENTOW), "Bledne ustawienie wartosci dla semafora SEMAFOR_MAX_ILOSC_KLIENTOW");
+    } else {
+        checkError(-1, "Podano wartosc semafora ponad limit");
+    }
 }
 
 void operacja_p(int semId, int semNum) {
@@ -227,7 +234,7 @@ int ListaKlientow::dodaj_klienta_do_listy(int pid_klienta) {
         if(klienci->ilosc >= 0 && klienci->ilosc < MAX_ILOSC_KLIENTOW) {
             klienci->lista_klientow[klienci->ilosc++] = pid_klienta;
         } else {
-            komunikat << "Za duzo ludzi w skelpie\n";
+            komunikat << "[ERROR] Za duzo ludzi w skelpie\n";
             return 0;
         }
         return 1;
@@ -253,8 +260,8 @@ void ListaKlientow::usun_klienta_z_listy(int pid_klienta) {
             }
             klienci->ilosc--;
             klienci->lista_klientow[klienci->ilosc] = 0;
-       }else {
-            komunikat << "Nie ma takiego klienta na liscie\n";
+       } else {
+            komunikat << "[ERROR] Nie ma takiego klienta na liscie\n";
        }
     }
 

@@ -11,3 +11,4 @@ $(TARGETS): %: %.cpp $(UTILS_SRC)
 
 clean:
 	rm -f $(TARGETS) *.o
+	ipcrm -a 2>/dev/null || true

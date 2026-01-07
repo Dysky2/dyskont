@@ -67,7 +67,7 @@
 
 // -- SEMAFORY --
 
-#define ILOSC_SEMAFOROW 9
+#define ILOSC_SEMAFOROW 12
 
 #define SEMAFOR_SAMOOBSLUGA 0
 #define SEMAFOR_STAC1 1
@@ -78,6 +78,9 @@
 #define SEMAFOR_LISTA_KLIENTOW 6
 #define SEMAFOR_OUTPUT 7
 #define SEMAFOR_STAN_DYSKONTU 8
+#define SEMAFOR_DZIALANIE_KASY_STAC1 9
+#define SEMAFOR_DZIALANIE_KASY_STAC2 10
+#define SEMAFOR_MAX_ILOSC_KLIENTOW 11
 
 #define LICZBA_KLIENTOW_NA_KASE 7
 
@@ -91,7 +94,7 @@ extern const std::vector<std::vector<std::string>> products;
 
 // -- Funkcje globalne --
 
-// Wyswietlenie bledu i wyjscie z programu EXIT_FAILURE
+// Wyswietlenie bledu
 void showError(const char * msg);
 
 // Sprawdzenie bledow wykonania danej funkcji

@@ -65,7 +65,7 @@ int main(int, char * argv[]) {
         } else if(obsluga.powod == 2) {
             // Czas az obsługa poprawi kase
             sleep(randomTime(CZAS_DZIALANIA_OBSLUGI / simulation_speed));
-
+            
             if(!czy_obsluguje) {
                 break;
             }

@@ -69,21 +69,27 @@ int main(int argc, char * argv[]) {
 
         int kasa = 0;
         switch (option) {
-            case 1:
-                if(stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] == 0) {
+            case 1: {
+                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                int status_stac2 = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2];
+                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                if(status_stac2 == 0) {
                     operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
 
                     komunikat << "[Kierownik] Zarzadam otwarcie kasy stacjonarnej 2\n";
 
                     operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
-                    stan_dyskontu->status_kasy[7] = 1;
-                    kill(stan_dyskontu->pid_kasy[ID_KASY_STACJONARNEJ_2], SIGUSR1);
+                    stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_2] = 1;
                     operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                    operacja_v(sem_id, SEMAFOR_DZIALANIE_KASY_STAC2);
                     
                 } else {
                     komunikat << "[Kierownik] Ta kasa jest juz otwarta\n";
                 }
                 break;
+            }
             case 2:
                 komunikat << "[Kierownik] Wybierz kase 1 lub 2: \n";
                 if (!(cin >> kasa)) {
@@ -93,6 +99,7 @@ int main(int argc, char * argv[]) {
                     komunikat << "[Kierownik] Musisz podac liczbe!\n";
                     break; 
                 }
+
                 if(kasa == 1) {
                     operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                     int status_kasy = stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1];
@@ -108,9 +115,15 @@ int main(int argc, char * argv[]) {
 
                         operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
 
+                        bool komunikat_wyswietlony = false;
                         while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac1) > 0 || dlugosc_kolejki > 0) {
-                            komunikat << "[Kierownik] Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
+                            if (!komunikat_wyswietlony) {
+                                komunikat << "[Kierownik] Czekam na obsluzenie klientow (Kasa 1)...\n";
+                                komunikat_wyswietlony = true;
+                            }
+
                             sleep(3);
+
                             operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                             dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[1];
                             operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
@@ -140,9 +153,16 @@ int main(int argc, char * argv[]) {
 
                         operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
 
+                        bool komunikat_wyswietlony = false;
                         while (pobierz_ilosc_wiadomosci(msqid_kolejka_stac2) > 0  || dlugosc_kolejki > 0) {
-                            komunikat << "[Kierownik] Nie moge zamknac kasy poniewaz, ludzie stoja dalej w kolejce\n";
+
+                            if (!komunikat_wyswietlony) {
+                                komunikat << "[Kierownik] Czekam na obsluzenie klientow (Kasa 2)...\n";
+                                komunikat_wyswietlony = true;
+                            }
+
                             sleep(3);
+
                             operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                             dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[2];
                             operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);

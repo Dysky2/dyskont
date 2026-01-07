@@ -6,13 +6,20 @@ using namespace std;
 
 volatile sig_atomic_t czy_kasa_otwarta = 1; 
 
-void zamknij_kase(int) {
+void zamknij_kase(int sig) {
+    (void)sig;
     czy_kasa_otwarta = 0;
 }
 
-void przerwij_prace(int) {}
+void przerwij_prace(int sig) {
+    // Przerwanie pracy poprzez wygenerowanie EINTR 
+    (void)sig;
+}
 
-void zacznij_prace(int) { }
+void zacznij_prace(int sig) {
+    // Przerwanie pracy poprzez wygenerowanie EINTR 
+    (void)sig;
+}
 
 int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
@@ -70,8 +77,9 @@ int main(int argc, char * argv[]) {
         operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
         int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
         operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+
         if(status_kasy == 0) {
-            sleep(2);
+            sleep(3);
             continue;
         }
 

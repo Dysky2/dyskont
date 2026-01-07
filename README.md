@@ -136,8 +136,21 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
 
 ## 6. Testy
 * **Test 1 (Obciążenie)**: 
-    * Opis: Symulacja wpuszcza naraz 100 klientów w bardzo krótkim czasie.
+    * Opis: Symulacja wpuszcza naraz 1000 klientów w bardzo krótkim czasie.
+    * Stałe ustawione: 
+        * MAX_ILOSC_KLIENTOW = 1000
+        * CZAS_KASOWANIA_PRODUKTOW 1
+        * CZAS_ROBIENIA_ZAKUPOW 1
+        * CZAS_WPUSZANIA_NOWYCH_KLIENTOW 1
+        * CZAS_DZIALANIA_OBSLUGI 1
     * Oczekiwany rezultat: System nie ulega awarii, dyskont poprawnie obsługuje każdego klienta, sprawdza czy żaden z limitów nie został przekroczony.
+    * Logi: 
+        ```
+        22:41:35 | [KLIENT-293408] WYCHODZI ZE SKLEPU
+        22:41:35 | [DYSKONT] Jest: 999 klientow w dyskoncie
+        22:41:35 | [DYSKONT] Ilosc ludzi w kolejce 2 0 0 
+        22:41:35 | [KLIENT-293777] Wchodzi do sklepu
+        ```
     * Wynik: [**Zaliczony**]
 * **Test 2 (Otwarcie kas)**: 
     * Opis: Dyskont poprawnie otwiera wszystkie kasy zgodnie z ilością klientów w sklepie.

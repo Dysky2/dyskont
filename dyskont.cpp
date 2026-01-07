@@ -6,15 +6,14 @@ using namespace std;
 
 volatile sig_atomic_t ewakuacja = 0; 
 
-int shmId_kasy = 0, dyskont_sem_id = 0, obsluga_id = 0, shm_id_klienci=0;
-
 void usun_zombie(int) {
 
     int saved_ernno = errno;
 
     while( waitpid(-1, NULL, WNOHANG) > 0);
 
-    errno = saved_ernno;
+    // Przypisanie starego errno
+    errno = saved_ernno; 
 }
 
 void wylacz_sklep(int) {
@@ -39,11 +38,11 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    dyskont_sem_id = utworz_grupe_semaforowa();
+    int dyskont_sem_id = utworz_grupe_semaforowa();
     ustaw_poczatkowe_wartosci_semaforow(dyskont_sem_id);
     
     // Tworze pamiec dzielona dla listy klientow w dyskoncie
-    shm_id_klienci = checkError( shmget(utworz_klucz('B'), sizeof(DaneListyKlientow), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej dla klientow" );
+    int shm_id_klienci = checkError( shmget(utworz_klucz('B'), sizeof(DaneListyKlientow), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej dla klientow" );
 
     DaneListyKlientow * dane_klientow = (DaneListyKlientow *) shmat(shm_id_klienci, NULL ,0);
 
@@ -53,7 +52,7 @@ int main() {
     }
     
     // Tworze pamiec dzielona dla stanu calego dyskontu
-    shmId_kasy = checkError( shmget(utworz_klucz('C'), sizeof(StanDyskontu), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej");
+    int shmId_kasy = checkError( shmget(utworz_klucz('C'), sizeof(StanDyskontu), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej");
 
     StanDyskontu * stan_dyskontu = (StanDyskontu *) shmat(shmId_kasy, NULL, 0);
 
@@ -136,11 +135,10 @@ int main() {
             "Blad wywolania execa"
         );
     }
-    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
-    obsluga_id = opid;
-    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
 
-    // Tworze wszytkie kasy i zostawiam otwarte tylko 3 samoobslugowe
+    int obsluga_id = opid;
+
+    // Tworze wszystkie kasy i zostawiam otwarte tylko 3 samoobslugowe
     for (int i=0;i<8;i++) {
         if(i < 6) {
             int pid = checkError( fork(), "Blad utowrzenia forka");
@@ -197,19 +195,18 @@ int main() {
     sleep(1);
 
     ListaKlientow * lista_klientow = new ListaKlientow(dane_klientow, 1);
+    int ilosc_klientow = 0;
     while( time(NULL) < dyskont_koniec && !ewakuacja) {
 
-        while(dane_klientow->ilosc > MAX_ILOSC_KLIENTOW - 2 && dane_klientow->ilosc < MAX_ILOSC_KLIENTOW) {
-            if(ewakuacja) break;
-            sleep(1);
-        }
-
         sleep(randomTime(CZAS_WPUSZANIA_NOWYCH_KLIENTOW / simulation_speed));
+
+        operacja_p(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
 
         if (time(NULL) >= dyskont_koniec || ewakuacja) {
             break;
         }
 
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
         int id = checkError( fork() , "Blad forka");
         if(id==0) {
             checkError(
@@ -226,7 +223,6 @@ int main() {
                 "Blad exec" 
             );
         } else {
-            operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
             lista_klientow->dodaj_klienta_do_listy(id);
             operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
         }
@@ -245,11 +241,11 @@ int main() {
 
             operacja_v(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
 
-            kill(stan_dyskontu->pid_kasy[ID_KASY_STACJONARNEJ_1], SIGUSR2);
+            operacja_v(dyskont_sem_id, SEMAFOR_DZIALANIE_KASY_STAC1);
         }
 
         operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-        int ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
         // Zamknięcie kasy samoobsługowej w zależności od ilości klientów
@@ -297,15 +293,12 @@ int main() {
             }
         }
 
-        stringstream semafory;
-        semafory << "[DYSKONT] Semafory: ";
-        operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
-        for(int i=0;i<ILOSC_SEMAFOROW;i++) {
-            semafory << semctl(dyskont_sem_id, i, GETVAL) << " ";
-        }
-        operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
-        komunikat << semafory.str() << "\n";
-        semafory.clear();
+
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
+        komunikat << "[DYSKONT] Jest: " << ilosc_klientow << " klientow w dyskoncie" << "\n";
 
         stringstream kolejki;
         kolejki << "[DYSKONT] Ilosc ludzi w kolejce ";
@@ -323,7 +316,7 @@ int main() {
     }
 
     operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-    int ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+    ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
     operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
     // czekanie az klienci opuszcza sklep
@@ -384,9 +377,11 @@ int main() {
         komunikat << "[DYSKONT] Zostalo: " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << " klientow w dyskoncie" << "\n";
         ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
     }
 
     // Kierownik opusza dyskont
+    komunikat << "[DYSKONT] Zarzadam wyjscie kierownika\n";
     if(stan_dyskontu->pid_kierownika > 0) {
         int kill_status_kierownik = kill(stan_dyskontu->pid_kierownika, SIGTERM);
         if(kill_status_kierownik == -1) {
@@ -397,6 +392,7 @@ int main() {
     }
 
     // Zakonczenie działania obłsugi
+    komunikat << "[DYSKONT] Zarzadam wyjscie obslugi\n";
     if(obsluga_id > 0) {
         int kill_status_obsluga = kill(obsluga_id, SIGTERM);
         if(kill_status_obsluga == -1) {
@@ -415,6 +411,11 @@ int main() {
             if(errno != ESRCH) {
                 showError("Blad wyslania SIGTERM do obslugi");
             }
+        }
+
+        if(i > 5) {
+            operacja_v(dyskont_sem_id, SEMAFOR_DZIALANIE_KASY_STAC1);
+            operacja_v(dyskont_sem_id, SEMAFOR_DZIALANIE_KASY_STAC2);
         }
     }
 

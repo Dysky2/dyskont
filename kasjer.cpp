@@ -6,17 +6,15 @@ using namespace std;
 
 volatile sig_atomic_t czy_kasa_otwarta = 1; 
 
-void zacznij_prace(int) { }
-
-void wstrzymaj_kase(int) { }
-
-void przerwij_prace(int) {}
+void przerwij_prace(int sig) {
+    // Przerwanie pracy poprzez wygenerowanie EINTR
+    (void)sig;
+}
 
 void zamknij_kase(int) {
     czy_kasa_otwarta = 0;
 }
 
-void otworz_kase_stac2(int) { }
 
 int main(int, char * argv[]) {
     srand(time(0) + getpid());
@@ -25,8 +23,7 @@ int main(int, char * argv[]) {
     
     utworz_grupe_semaforowa();
 
-    signal(SIGALRM, wstrzymaj_kase);
-    signal(SIGUSR1, otworz_kase_stac2);
+    signal(SIGALRM, przerwij_prace);
     signal(SIGUSR2, przerwij_prace);
     signal(SIGINT, zamknij_kase);
     signal(SIGTERM, zamknij_kase);
@@ -50,8 +47,10 @@ int main(int, char * argv[]) {
 
     int nr_kasy = checkError(findInexOfPid(getpid(), stan_dyskontu), "Blad: nie znaleziono pidu kasy\n");
 
+    int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
+
     while(czy_kasa_otwarta) {
-        int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
+        int sem_number = nr_kasy == ID_KASY_STACJONARNEJ_1 ? SEMAFOR_DZIALANIE_KASY_STAC1 : SEMAFOR_DZIALANIE_KASY_STAC2;
         
         operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
         int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
@@ -60,7 +59,7 @@ int main(int, char * argv[]) {
         int wiadomosci_w_kolejce = pobierz_ilosc_wiadomosci(id_kasy);
 
         if(status_kasy == 0 && wiadomosci_w_kolejce == 0) {
-            sleep(1);
+            operacja_p(sem_id, sem_number);
             continue;
         }
 

@@ -93,7 +93,6 @@ int main(int, char * argv[]) {
     
     // ILES CZASU JEST W SKLEPIE 
     sleep(randomTime(CZAS_ROBIENIA_ZAKUPOW));
-    // ten sleep powinien byc git po jakby wstrzymuje ten proces na iles
     
     int startoweId = msqid_kolejka_samo;
     int startowyNr = 0;
@@ -133,7 +132,7 @@ int main(int, char * argv[]) {
         operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
         operacja_v(sem_id, aktualnyNr);
 
-        komunikat << "[" << "KLIENT-" << getpid() << "] " << "Staje do kasy " << aktualnyNr << "\n";
+        komunikat << "[" << "KLIENT-" << getpid() << "] " << "Staje do kolejki " << aktualnyNr << "\n";
     }
 
     time_t czas_startu = time(NULL);
@@ -288,6 +287,7 @@ int main(int, char * argv[]) {
     operacja_v(sem_id, SEMAFOR_LISTA_KLIENTOW);
 
     operacja_p(sem_id, SEMAFOR_ILOSC_KLIENTOW);
+    operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n";
     
     delete kolejka;
