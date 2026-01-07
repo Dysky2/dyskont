@@ -87,9 +87,7 @@ int main(int argc, char * argv[]) {
         }
 
         komunikat << "[KASA-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT " << klient.klient_id << " Ilosc produktow " << klient.ilosc_produktow << " O typie: " << klient.mtype << " Z TEJ STRONY: " << getpid() << "\n";
-        
-        sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW / simulation_speed));
-        
+                
         if(!czy_kasa_otwarta) continue;
 
         stringstream paragon;
@@ -109,6 +107,7 @@ int main(int argc, char * argv[]) {
 
         int aktualna_pozycja = 0, suma = 0, czy_klient_zostal_sprawdzony = 0, czy_jest_pelnoletni = 0 , ile_produktow_odlozonych = 0;
         for(int i=0;i < klient.ilosc_produktow;i++) {
+            sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW / simulation_speed));
 
             if(!czy_kasa_otwarta) break; 
 

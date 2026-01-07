@@ -8,10 +8,17 @@ Virtualization:     wsl \
 Operating System:   Ubuntu 22.04.5 LTS \
 Kernel:             Linux 6.6.87.2-microsoft-standard-WSL2 \
 Architecture:       x86-64 \
-gcc version: 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04.2)
+g++ (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+
+### Wymagania wstępne
+
+* `tmux`
+* `make`
+* `g++`
 
 ### Aby rozpocząć symulację, w katalogu projektu należy wykonać polecenie:
 ```bash
+chmod u+x start.sh
 ./start.sh
 ```
 Skrypt start.sh automatycznie kompiluje projekt (przy użyciu Makefile) i uruchamia symulację.
@@ -134,14 +141,14 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
     * Wynik: [**Zaliczony**]
 * **Test 2 (Otwarcie kas)**: 
     * Opis: Dyskont poprawnie otwiera wszystkie kasy zgodnie z ilością klientów w sklepie.
-    * Oczekiwany rezultat: Po wejściu do sklepu 25 klientów dyskont powinien poprawnie otworzyć 7 kas (6 samoobsługowych i 1 stacjonarną).
+    * Oczekiwany rezultat: Po wejściu do sklepu 42 klientów dyskont powinien poprawnie otworzyć 7 kas (6 samoobsługowych i 1 stacjonarną).
     * Wynik: [**Zaliczony**]
 * **Test 3 (Weryfikacja wieku)**: 
     * Opis: Klient kupujący alkohol, zostanie sprawdzony przez obsługę, czy ma do tego prawo.
     * Oczekiwany rezultat: Jeżeli klient jest pełnoletni, alkohol zostanie mu sprzedany, jeśli nie, zostanie odstawiony na półkę.
     * Wynik: [**Zaliczony**]
 * **Test 4 (Zamknięcie kas)**: 
-    * Opis: Kierownik otwiera kasę stacjonarną 2 od razu po otwarciu sie dyskontu.
+    * Opis: Kierownik zarządza otwarcie kasy stacjonarnej 2 od razu po otwarciu sie dyskontu.
     * Oczekiwany rezultat: Jeżeli przez 30 sekund nikt nie pojawi sie w kolejce do tej kasy, powinna się ona zamknąć.
     * Wynik: [**Zaliczony**]
 * **Test 5 (Posprzątanie zasobów)**:
@@ -153,7 +160,7 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
     * Oczekiwany rezultat: Obługa podejdzie do kasy zgłaszającej błąd i odblokuje kasę, aby klient mógł dokończyć zakupy.
     * Wynik: [**Zaliczony**]
 * **Test 7 (Sygnał ewakuacji)**:
-    * Opis: Kierownik zarządza ewakuację całego dyskontu .
+    * Opis: Kierownik zarządza ewakuację całego dyskontu.
     * Oczekiwany rezultat: Klienci opuszczają dyskont bez robienia zakupów, następnie zamykane są wszystkie kasy.
     * Wynik: [**Zaliczony**]
 

@@ -86,7 +86,7 @@ int main(int, char * argv[]) {
             }
             if(errno == EIDRM || errno == EINVAL) break;
             if(errno == EINTR) {
-                komunikat << "[KASJER-" << getpid() << "] " << "Zamykam kase gdzy nie pojawil sie zaden klient: "<< "\n";
+                komunikat << "[KASJER-" << getpid() << "] " << "Idzie na przerwe"<< "\n";
                 operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
 
                 operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
@@ -97,8 +97,6 @@ int main(int, char * argv[]) {
         }
 
         komunikat << "[KASJER-" << getpid() << "-" << klient.nrKasy << "]" << " ODEBRANO KOMUNIKAT W KASJERZE " << klient.klient_id << " Z TEJ STRONY: " << getpid() << " nrkasy to " << klient.nrKasy << "\n";
-
-        sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW / simulation_speed));
 
         if(!czy_kasa_otwarta) continue;
         
@@ -119,6 +117,8 @@ int main(int, char * argv[]) {
 
         int aktualna_pozycja = 0, suma = 0, ile_produktow_odlozonych = 0;
         for(int i=0;i < klient.ilosc_produktow;i++) {
+            sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW / simulation_speed));
+
             char * produkt = klient.lista_produktow + aktualna_pozycja;
             if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
                 if(klient.wiek >= 18) {

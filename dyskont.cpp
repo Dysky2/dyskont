@@ -333,7 +333,7 @@ int main() {
         ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
-        // Otwarcie kasy samoobsługowej w zależności od ilości klientów
+        // Zamykanie kasy samoobsługowej w zależności od ilości klientów
         if(ilosc_klientow < LICZBA_KLIENTOW_NA_KASE * (ilosc_otwratych_kas - 3)) {
             for(int i = 5;i > 2;i--) {
                 if(stan_dyskontu->status_kasy[i] == 1) {
@@ -378,7 +378,7 @@ int main() {
             }
         }
 
-        sleep(2);
+        usleep(1500000);
         
         operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
         komunikat << "[DYSKONT] Zostalo: " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << " klientow w dyskoncie" << "\n";
