@@ -138,43 +138,107 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
 * **Test 1 (Obciążenie)**: 
     * Opis: Symulacja wpuszcza naraz 1000 klientów w bardzo krótkim czasie.
     * Stałe ustawione: 
-        * MAX_ILOSC_KLIENTOW = 1000
-        * CZAS_KASOWANIA_PRODUKTOW 1
-        * CZAS_ROBIENIA_ZAKUPOW 1
-        * CZAS_WPUSZANIA_NOWYCH_KLIENTOW 1
-        * CZAS_DZIALANIA_OBSLUGI 1
+        * [utils.h-45] MAX_ILOSC_KLIENTOW = 1000
+        * [utils.h-63] CZAS_KASOWANIA_PRODUKTOW 1
+        * [utils.h-64] CZAS_ROBIENIA_ZAKUPOW 1
+        * [utils.h-65] CZAS_WPUSZANIA_NOWYCH_KLIENTOW 1
+        * [utils.h-66] CZAS_DZIALANIA_OBSLUGI 1
     * Oczekiwany rezultat: System nie ulega awarii, dyskont poprawnie obsługuje każdego klienta, sprawdza czy żaden z limitów nie został przekroczony.
     * Logi: 
         ```
-        22:41:35 | [KLIENT-293408] WYCHODZI ZE SKLEPU
-        22:41:35 | [DYSKONT] Jest: 999 klientow w dyskoncie
-        22:41:35 | [DYSKONT] Ilosc ludzi w kolejce 2 0 0 
-        22:41:35 | [KLIENT-293777] Wchodzi do sklepu
+        17:05:43 | [DYSKONT] wchodzi klient 70200
+        17:05:43 | [DYSKONT] Jest: 1000 klientow w dyskoncie
         ```
     * Wynik: [**Zaliczony**]
 * **Test 2 (Otwarcie kas)**: 
-    * Opis: Dyskont poprawnie otwiera wszystkie kasy zgodnie z ilością klientów w sklepie.
+    * Opis: Dyskont poprawnie otwiera wszystkie kasy zgodnie z ilością klientów w sklepie i ilością klientów w kolejce.
     * Oczekiwany rezultat: Po wejściu do sklepu 42 klientów dyskont powinien poprawnie otworzyć 7 kas (6 samoobsługowych i 1 stacjonarną).
+    * Logi:
+        ```
+        17:52:49 | [DYSKONT] otwieram kase stacjonarną 1
+        17:52:53 | [DYSKONT] OTWIERAM KASE 4
+        17:52:59 | [DYSKONT] OTWIERAM KASE 5
+        17:53:02 | [DYSKONT] OTWIERAM KASE 6
+        ```
+    
     * Wynik: [**Zaliczony**]
 * **Test 3 (Weryfikacja wieku)**: 
     * Opis: Klient kupujący alkohol, zostanie sprawdzony przez obsługę, czy ma do tego prawo.
     * Oczekiwany rezultat: Jeżeli klient jest pełnoletni, alkohol zostanie mu sprzedany, jeśli nie, zostanie odstawiony na półkę.
+    * Logi:
+        ```
+        18:16:39 | [KASA-90567] Potrzebna weryfikacja wieku dla: 90755
+        18:16:44 | [OBSLUGA] Klient jest pelnoletni, moze kupic alkohol, przy kasie: 90567
+        ```
     * Wynik: [**Zaliczony**]
 * **Test 4 (Zamknięcie kas)**: 
     * Opis: Kierownik zarządza otwarcie kasy stacjonarnej 2 od razu po otwarciu sie dyskontu.
     * Oczekiwany rezultat: Jeżeli przez 30 sekund nikt nie pojawi sie w kolejce do tej kasy, powinna się ona zamknąć.
+    * Stałe ustawione: 
+        * [utils.h-64] CZAS_ROBIENIA_ZAKUPOW 50
+        * [utils.h-65] CZAS_WPUSZANIA_NOWYCH_KLIENTOW 50
+    * Logi:
+        ```
+        18:27:04 | [Kierownik] Zarzadam otwarcie kasy stacjonarnej 2
+        18:27:36 | [KASJER-95210] Idzie na przerwe
+        ```
     * Wynik: [**Zaliczony**]
 * **Test 5 (Posprzątanie zasobów)**:
     * Opis: Podczas trwania symulacji, zostanie wysłany sygnał SIGINT (CTRL + C).
     * Oczekiwany rezultat: Symulacja powinna poprawnie usunąć wszystkie zasoby, z których korzystała.
+    * Logi:
+        ```
+        18:45:04 | [KLIENT-101099] Wchodzi do sklepu
+        18:45:04 | [KLIENT-101100] Wchodzi do sklepu
+        ^C
+        18:45:05 | [KLIENT-101100] WYCHODZI ZE SKLEPU
+        18:45:05 | [KLIENT-101099] WYCHODZI ZE SKLEPU
+        18:45:05 | [KLIENT-101065] WYCHODZI ZE SKLEPU
+        18:45:05 | [KLIENT-101087] WYCHODZI ZE SKLEPU
+        18:45:05 | [KASA-101051] Koniec
+        18:45:05 | [OBSLUGA] Koncze prace 
+
+
+        ipcs -a
+
+        ------ Message Queues --------
+        key        msqid      owner      perms      used-bytes   messages
+
+        ------ Shared Memory Segments --------
+        key        shmid      owner      perms      bytes      nattch     status
+
+        ------ Semaphore Arrays --------
+        key        semid      owner      perms      nsems
+
+        ```
     * Wynik: [**Zaliczony**]
 * **Test 6 (Waga towaru)**:
     * Opis: Może zdarzyć się sytuacja w której waga towaru nie zgadza się z produktem który klient dostarczył.
     * Oczekiwany rezultat: Obługa podejdzie do kasy zgłaszającej błąd i odblokuje kasę, aby klient mógł dokończyć zakupy.
+    * Logi:
+        ```
+        18:50:31 | [KASA-102786] Waga towaru sie nie zgadza, prosze poczekac na obsluge 
+        18:50:35 | [OBSLUGA] Waga przy kasie 102786 zostala naprawiona
+        ```
     * Wynik: [**Zaliczony**]
 * **Test 7 (Sygnał ewakuacji)**:
     * Opis: Kierownik zarządza ewakuację całego dyskontu.
     * Oczekiwany rezultat: Klienci opuszczają dyskont bez robienia zakupów, następnie zamykane są wszystkie kasy.
+    * Logi:
+        ```
+        18:53:26 | [Kierownik] Kierownik zarzadzil zamkniecie sklepu
+        18:53:26 | [KLIENT-103802] WYCHODZI ZE SKLEPU
+        18:53:26 | [KLIENT-103814] WYCHODZI ZE SKLEPU
+        18:53:26 | [KLIENT-103820] WYCHODZI ZE SKLEPU
+        18:53:27 | [DYSKONT] Zarzadam wyjscie kierownika
+        18:53:27 | [DYSKONT] Zarzadam wyjscie obslugi
+        18:53:27 | [OBSLUGA] Koncze prace 
+        18:53:27 | [DYSKONT] WYLACZENIE KAS
+        18:53:27 | [KASA-103755] Koniec
+        18:53:27 | [KASA-103756] Koniec
+        18:53:27 | [KASA-103759] Koniec
+        18:53:27 | [KASJER-103762] Zamykam kase stacjonarna
+        ```
     * Wynik: [**Zaliczony**]
 
 ## 7. Wymagane funkcje systemowe i linki do kodu

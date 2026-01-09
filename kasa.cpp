@@ -6,6 +6,11 @@ using namespace std;
 
 volatile sig_atomic_t czy_kasa_otwarta = 1; 
 
+void obudz_kase(int sig) {
+    //wybudza kase z pause()
+    (void)sig;
+}
+
 void zamknij_kase(int sig) {
     (void)sig;
     czy_kasa_otwarta = 0;
@@ -29,6 +34,7 @@ int main(int argc, char * argv[]) {
     signal(SIGUSR1, zacznij_prace);
     signal(SIGINT, zamknij_kase);
     signal(SIGTERM, zamknij_kase);
+    signal(SIGALRM, obudz_kase);
     signal(SIGUSR2, przerwij_prace);
 
     if(argc <= 3) {
@@ -79,7 +85,9 @@ int main(int argc, char * argv[]) {
         operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
 
         if(status_kasy == 0) {
-            sleep(3);
+            alarm(3);
+            pause();
+            alarm(0);
             continue;
         }
 
@@ -177,8 +185,8 @@ int main(int argc, char * argv[]) {
 
             if(!czy_klient_zostal_sprawdzony) {
                 if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
-                    
                     operacja_p(sem_id, SEMAFOR_OBSLUGA);
+                    komunikat << "[KASA-" << getpid() << "]" << " Potrzebna weryfikacja wieku dla: " << klient.klient_id << "\n";
 
                     Obsluga obsluga = {1,1,getpid(), klient.wiek, -1};
                     if(czy_kasa_otwarta) {

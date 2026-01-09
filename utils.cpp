@@ -77,7 +77,7 @@ void operacja_p(int semId, int semNum) {
     struct sembuf operacjaP;
     operacjaP.sem_num = semNum;
     operacjaP.sem_op = -1;
-    operacjaP.sem_flg = SEM_UNDO;
+    operacjaP.sem_flg = 0;
     while(semop(semId, &operacjaP, 1) == -1) {
         if(errno == EINTR) {
             continue;
@@ -94,7 +94,7 @@ void operacja_v(int semId, int semNum) {
     struct sembuf operacjaV;
     operacjaV.sem_num = semNum;
     operacjaV.sem_op = 1;
-    operacjaV.sem_flg = SEM_UNDO;
+    operacjaV.sem_flg = 0;
     while(semop(semId, &operacjaV, 1) == -1) {
         if(errno == EINTR) {
             continue;

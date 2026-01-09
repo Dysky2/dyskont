@@ -3,7 +3,7 @@
 SESJA="symulacja"
 CMD="make; ./dyskont"
 
-tmux has-session -t "$SEJSA" 2>/dev/null
+tmux has-session -t "$SESJA" 2>/dev/null
 
 if [ $? != 0 ]; then
 

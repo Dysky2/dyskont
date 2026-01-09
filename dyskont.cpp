@@ -107,7 +107,7 @@ int main() {
                             to_string(dyskont_sem_id) + " " + 
                             to_string(msqid_kolejka_stac1) + " " + 
                             to_string(msqid_kolejka_stac2) + " " +
-                            nazwa_katalogu + "; exec bash";
+                            nazwa_katalogu + "; echo 'Wcisnij ENTER aby zamknac okno'; read";
         execlp("tmux",
             "tmux",
             "split-window",
@@ -203,6 +203,7 @@ int main() {
         operacja_p(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
 
         if (time(NULL) >= dyskont_koniec || ewakuacja) {
+            operacja_v(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW); 
             break;
         }
 
@@ -223,6 +224,7 @@ int main() {
                 "Blad exec" 
             );
         } else {
+            komunikat << "[DYSKONT] Wchodzi klient " << id << "\n";
             lista_klientow->dodaj_klienta_do_listy(id);
             operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
         }
@@ -238,6 +240,8 @@ int main() {
             operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
             stan_dyskontu->status_kasy[ID_KASY_STACJONARNEJ_1] = 1;
             operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
+            komunikat << "[DYSKONT] otwieram kase stacjonarną 1\n";
 
             operacja_v(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
 
@@ -267,7 +271,7 @@ int main() {
         }
 
         // Otwarcie kasy samoobsługowej w zależności od ilości klientów
-        if (ilosc_klientow >= ilosc_otwratych_kas * LICZBA_KLIENTOW_NA_KASE && ilosc_otwratych_kas <= 5) {
+        if (ilosc_klientow >= (ilosc_otwratych_kas + 1) * LICZBA_KLIENTOW_NA_KASE && ilosc_otwratych_kas <= 5) {
             int wolny_status = -1;
             for(int i = 0;i < 6;i++) {
                 operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);

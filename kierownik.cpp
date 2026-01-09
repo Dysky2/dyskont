@@ -10,7 +10,6 @@ void zamknij_kierownika(int) {
     czy_kierownik_ma_dzialac = 0;
     close(STDIN_FILENO);
 }
-void kontynuj_prace(int) {}
 
 int main(int argc, char * argv[]) {
     srand(time(0) + getpid());
@@ -26,7 +25,6 @@ int main(int argc, char * argv[]) {
 
     signal(SIGTERM, zamknij_kierownika);
     signal(SIGINT, zamknij_kierownika);
-    signal(SIGALRM, kontynuj_prace);
 
     int shmid_kasy = atoi(argv[1]);
     int sem_id = atoi(argv[2]);

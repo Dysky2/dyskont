@@ -79,6 +79,7 @@ int main(int, char * argv[]) {
             operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
             int dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[nr_kasy == 6 ? 1 : 2];
             operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+            if(!czy_kasa_otwarta) break;
 
             if(errno == EINTR && (dlugosc_kolejki > 0)) {
                 continue;
@@ -118,6 +119,8 @@ int main(int, char * argv[]) {
         for(int i=0;i < klient.ilosc_produktow;i++) {
             sleep(randomTime(CZAS_KASOWANIA_PRODUKTOW / simulation_speed));
 
+            if(!czy_kasa_otwarta) break;
+
             char * produkt = klient.lista_produktow + aktualna_pozycja;
             if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
                 if(klient.wiek >= 18) {
@@ -136,6 +139,12 @@ int main(int, char * argv[]) {
                     << right << setw(8) << cena << " zl |\n";
             }
             aktualna_pozycja += strlen(produkt) + 1;
+        }
+
+        if(!czy_kasa_otwarta) {
+            paragon.str("");
+            paragon.clear();
+            continue;
         }
 
         if(suma == 0) {
