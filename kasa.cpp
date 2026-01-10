@@ -6,24 +6,15 @@ using namespace std;
 
 volatile sig_atomic_t czy_kasa_otwarta = 1; 
 
-void obudz_kase(int sig) {
-    //wybudza kase z pause()
+int kasa_sem_id = 0, nr_kasy = 0;
+
+void hanlder_dla_eintr(int sig) {
     (void)sig;
 }
 
-void zamknij_kase(int sig) {
-    (void)sig;
+void zamknij_kase(int) {
+    operacja_v(kasa_sem_id, znajdzSemaforKasy(nr_kasy));
     czy_kasa_otwarta = 0;
-}
-
-void przerwij_prace(int sig) {
-    // Przerwanie pracy poprzez wygenerowanie EINTR 
-    (void)sig;
-}
-
-void zacznij_prace(int sig) {
-    // Przerwanie pracy poprzez wygenerowanie EINTR 
-    (void)sig;
 }
 
 int main(int argc, char * argv[]) {
@@ -31,11 +22,11 @@ int main(int argc, char * argv[]) {
 
     prctl(PR_SET_PDEATHSIG, SIGTERM);
 
-    signal(SIGUSR1, zacznij_prace);
+    signal(SIGUSR1, hanlder_dla_eintr);
     signal(SIGINT, zamknij_kase);
     signal(SIGTERM, zamknij_kase);
-    signal(SIGALRM, obudz_kase);
-    signal(SIGUSR2, przerwij_prace);
+    signal(SIGALRM, hanlder_dla_eintr);
+    signal(SIGUSR2, hanlder_dla_eintr);
 
     if(argc <= 3) {
         showError("Podano za malo argumentow dla kasy");
@@ -44,7 +35,7 @@ int main(int argc, char * argv[]) {
 
     utworz_grupe_semaforowa();
 
-    int sem_id = atoi(argv[1]);
+    kasa_sem_id = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_samo = atoi(argv[3]);
     int msqid_kolejka_obsluga = atoi(argv[4]);
@@ -64,30 +55,28 @@ int main(int argc, char * argv[]) {
     stringstream bufor;
     bufor << "[KASA] ";
     for(int i=0;i<8;i++) {
-        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+        operacja_p(kasa_sem_id, SEMAFOR_STAN_DYSKONTU);
         bufor << stan_dyskontu->pid_kasy[i] << " ";
-        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+        operacja_v(kasa_sem_id, SEMAFOR_STAN_DYSKONTU);
     }
     for(int i=0;i<8;i++) {
-        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);  
+        operacja_p(kasa_sem_id, SEMAFOR_STAN_DYSKONTU);  
         bufor << stan_dyskontu->status_kasy[i] << " ";
-        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+        operacja_v(kasa_sem_id, SEMAFOR_STAN_DYSKONTU);
     }
     bufor << "\n";
     komunikat << bufor.str();
     bufor.clear();
 
-    int nr_kasy = checkError(findInexOfPid(getpid(), stan_dyskontu), "Blad: nie znaleziono pidu kasy\n");
+    nr_kasy = checkError(findInexOfPid(getpid(), stan_dyskontu), "Blad: nie znaleziono pidu kasy\n");
 
     while(czy_kasa_otwarta) {
-        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+        operacja_p(kasa_sem_id, SEMAFOR_STAN_DYSKONTU);
         int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
-        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+        operacja_v(kasa_sem_id, SEMAFOR_STAN_DYSKONTU);
 
         if(status_kasy == 0) {
-            alarm(3);
-            pause();
-            alarm(0);
+            operacja_p(kasa_sem_id, znajdzSemaforKasy(nr_kasy));
             continue;
         }
 
@@ -130,7 +119,7 @@ int main(int argc, char * argv[]) {
             // 2% szans ze kasa utknie
             if(randomTimeWithRange(1, 100) > 98) {
 
-                operacja_p(sem_id, SEMAFOR_OBSLUGA);
+                operacja_p(kasa_sem_id, SEMAFOR_OBSLUGA);
 
                 komunikat << "[KASA-" << getpid() << "]" << " Waga towaru sie nie zgadza, prosze poczekac na obsluge \n";
                 Obsluga obsluga = {1, 2, getpid(), -1, -1};
@@ -140,35 +129,35 @@ int main(int argc, char * argv[]) {
 
                     if(send_status == -1) {
                         if (errno == EINTR) {
-                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                             i--;
                             continue;
                         } else {
-                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                             showError("Bledne wyslanie wiadomosci do oblugi o sprawdzenie waga");
                             exit(EXIT_FAILURE);
                         }
                     }
 
                 } else {
-                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                    operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                     break;
                 }
 
                 int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
 
                 if(!czy_kasa_otwarta) {
-                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                    operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                     break;
                 }
 
                 if(rcvStatus == -1) {
                     if(errno == EINTR && !czy_kasa_otwarta) {
-                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                         break;
                     }
                     if(errno == EINTR) {
-                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                         i--;
                         continue;
                     } else {
@@ -177,7 +166,7 @@ int main(int argc, char * argv[]) {
                     }
                 }
 
-                operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
             }
 
             char * produkt = klient.lista_produktow + aktualna_pozycja;
@@ -185,7 +174,7 @@ int main(int argc, char * argv[]) {
 
             if(!czy_klient_zostal_sprawdzony) {
                 if( strcmp(produkt, "Whisky") == 0 || strcmp(produkt, "Piwo")  == 0 ||  strcmp(produkt, "Wino")  == 0 || strcmp(produkt, "Wodka")  == 0 ) {
-                    operacja_p(sem_id, SEMAFOR_OBSLUGA);
+                    operacja_p(kasa_sem_id, SEMAFOR_OBSLUGA);
                     komunikat << "[KASA-" << getpid() << "]" << " Potrzebna weryfikacja wieku dla: " << klient.klient_id << "\n";
 
                     Obsluga obsluga = {1,1,getpid(), klient.wiek, -1};
@@ -194,34 +183,34 @@ int main(int argc, char * argv[]) {
 
                         if(send_status == -1) {
                             if (errno == EINTR) {
-                                operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                                operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                                 i--;
                                 continue;
                             } else {
-                                operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                                operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                                 showError("Bledne wyslanie wiadomosci do oblugi o sprawdzenie alkoholu");
                                 exit(EXIT_FAILURE);
                             }
                         }
                     } else {
-                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                         break;
                     }
 
                     int rcvStatus = msgrcv(msqid_kolejka_obsluga, &obsluga, sizeof(Obsluga) - sizeof(long int), getpid(), 0);
 
                     if(!czy_kasa_otwarta) {
-                        operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                        operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                         break;
                     }
 
                     if(rcvStatus == -1) {
                         if(errno == EINTR && !czy_kasa_otwarta) {
-                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                             break;
                         }
                         if(errno == EINTR) {
-                            operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                            operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                             i--;
                             continue;
                         } else {
@@ -236,7 +225,7 @@ int main(int argc, char * argv[]) {
                         czy_jest_pelnoletni = 1;
                     }
                     
-                    operacja_v(sem_id, SEMAFOR_OBSLUGA);
+                    operacja_v(kasa_sem_id, SEMAFOR_OBSLUGA);
                 } 
             }
 

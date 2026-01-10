@@ -7,9 +7,13 @@
 using namespace std;
 
 volatile sig_atomic_t czy_klient_ma_dzialac = 1; 
+volatile sig_atomic_t czy_awaria = 0; 
 
-void opusc_sklep(int) {
+void opusc_sklep(int sig) {
     czy_klient_ma_dzialac = 0;
+    if(sig == SIGTERM) {
+        czy_awaria = 1;
+    }
 }
 
 // Generuje miedzy 3-10 produktów z 10 kategori i przypisuje do wskaznika na strukture Klient
@@ -129,7 +133,6 @@ int main(int, char * argv[]) {
     int aktualnyNr = startowyNr;
 
     if(czy_klient_ma_dzialac) {
-
         operacja_p(sem_id, aktualnyNr);
         operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
         kolejka->dodaj_do_kolejki(getpid(), aktualnyNr);
@@ -202,6 +205,8 @@ int main(int, char * argv[]) {
                 operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
                 continue;
             }
+
+            if(!czy_klient_ma_dzialac || czy_awaria) break;
 
             Klient odebrany;
             memset(&klient, 0, sizeof(Klient)); 
@@ -287,12 +292,14 @@ int main(int, char * argv[]) {
         operacja_v(sem_id, aktualnyNr);
     }
 
+    operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+
     operacja_p(sem_id, SEMAFOR_LISTA_KLIENTOW);
     lista_klientow->usun_klienta_z_listy(getpid());
     operacja_v(sem_id, SEMAFOR_LISTA_KLIENTOW);
 
     operacja_p(sem_id, SEMAFOR_ILOSC_KLIENTOW);
-    operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n";
     
     delete kolejka;

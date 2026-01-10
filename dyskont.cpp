@@ -61,6 +61,8 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    Kolejka kolejka(stan_dyskontu);
+
     operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
     stan_dyskontu->sredni_czas_obslugi[0] = CZAS_OCZEKIWANIA_NA_KOLEJKE_SAMOOBSLUGOWA;
     stan_dyskontu->sredni_czas_obslugi[1] = CZAS_OCZEKIWANIA_NA_KOLEJKE_STACJONARNA;
@@ -161,6 +163,9 @@ int main() {
                     stan_dyskontu->pid_kasy[i] = pid;
                     stan_dyskontu->status_kasy[i]= 1;
                     operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
+                    operacja_v(dyskont_sem_id, i + SEMAFOR_DZIALANIE_SAMOOBLSUGA_1);
+                    
                     ilosc_otwratych_kas++;
                 } else {
                     operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
@@ -290,12 +295,44 @@ int main() {
                 stan_dyskontu->status_kasy[wolny_status] = 1;
                 operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                 
+                operacja_v(dyskont_sem_id, wolny_status + SEMAFOR_DZIALANIE_SAMOOBLSUGA_1);
                 ilosc_otwratych_kas++;
 
                 operacja_v(dyskont_sem_id, SEMAFOR_ILOSC_KAS);
                 kill(stan_dyskontu->pid_kasy[wolny_status], SIGUSR1);
             }
         }
+        
+        for(int i=0; i < ILOSC_KOLJEJEK; i++) {
+            operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+            int pid_klienta = stan_dyskontu->kolejka_klientow[i][0];
+            operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
+            if(pid_klienta > 0) {
+                if(kill(pid_klienta, 0) == -1 && errno == ESRCH) {
+                    komunikat << "[DYSKONT] Wykryto klienta ducha\n";
+                    operacja_p(dyskont_sem_id, i);
+                    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                    kolejka.usun_z_kolejki(pid_klienta, i);
+                    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                    operacja_v(dyskont_sem_id, i);
+                }
+            }
+        }
+
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        int aktualna_ilosc = dane_klientow->ilosc;
+
+        for(int i=0; i < aktualna_ilosc;i++) {
+            int pid_klienta = dane_klientow->lista_klientow[i];
+            if(pid_klienta > 0 && kill(pid_klienta, 0) == -1 && errno == ESRCH) {
+                lista_klientow->usun_klienta_z_listy(pid_klienta);
+                operacja_v(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+                i--;
+                aktualna_ilosc--;
+            }
+        }
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
 
         operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
@@ -320,14 +357,14 @@ int main() {
     }
 
     operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-    ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+    ilosc_klientow = dane_klientow->ilosc;
     operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
     // czekanie az klienci opuszcza sklep
     while (ilosc_klientow > 0) {
 
         operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        ilosc_klientow = dane_klientow->ilosc;
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
         // Zamykanie kasy samoobsługowej w zależności od ilości klientów
@@ -347,11 +384,43 @@ int main() {
             }
         }
 
+        for(int i=0; i < ILOSC_KOLJEJEK; i++) {
+            operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+            int pid_klienta = stan_dyskontu->kolejka_klientow[i][0];
+            operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+
+            if(pid_klienta > 0) {
+                if(kill(pid_klienta, 0) == -1 && errno == ESRCH) {
+                    komunikat << "[DYSKONT] Wykryto klienta ducha\n";
+                    operacja_p(dyskont_sem_id, i);
+                    operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                    kolejka.usun_z_kolejki(pid_klienta, i);
+                    operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
+                    operacja_v(dyskont_sem_id, i);
+                }
+            }
+        }
+
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        int aktualna_ilosc = dane_klientow->ilosc;
+
+        for(int i=0; i < aktualna_ilosc;i++) {
+            int pid_klienta = dane_klientow->lista_klientow[i];
+            if(pid_klienta > 0 && kill(pid_klienta, 0) == -1 && errno == ESRCH) {
+                lista_klientow->usun_klienta_z_listy(pid_klienta);
+                operacja_v(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+                i--;
+                aktualna_ilosc--;
+            }
+        }
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
         if(ewakuacja) {
             for(int i=0;i<8;i++) {
                 operacja_p(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
                 if(stan_dyskontu->status_kasy[i] != 0) {
                     stan_dyskontu->status_kasy[i] = 0;
+                    operacja_v(dyskont_sem_id, i + SEMAFOR_DZIALANIE_SAMOOBLSUGA_1);
                     kill(stan_dyskontu->pid_kasy[i], SIGUSR2);
                 }
                 operacja_v(dyskont_sem_id, SEMAFOR_STAN_DYSKONTU);
@@ -375,11 +444,19 @@ int main() {
             }
         }
 
+        operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+        ilosc_klientow = dane_klientow->ilosc;
+        operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
+
+        if (ilosc_klientow > 0) {
+            pause(); 
+        }
+
         usleep(1500000);
         
         operacja_p(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
-        komunikat << "[DYSKONT] Zostalo: " << semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL) << " klientow w dyskoncie" << "\n";
-        ilosc_klientow = semctl(dyskont_sem_id, SEMAFOR_ILOSC_KLIENTOW, GETVAL);
+        komunikat << "[DYSKONT] Zostalo: " << dane_klientow->ilosc << " klientow w dyskoncie" << "\n";
+        ilosc_klientow = dane_klientow->ilosc;
         operacja_v(dyskont_sem_id, SEMAFOR_LISTA_KLIENTOW);
 
     }
@@ -416,11 +493,6 @@ int main() {
                 showError("Blad wyslania SIGTERM do obslugi");
             }
         }
-
-        if(i > 5) {
-            operacja_v(dyskont_sem_id, SEMAFOR_DZIALANIE_KASY_STAC1);
-            operacja_v(dyskont_sem_id, SEMAFOR_DZIALANIE_KASY_STAC2);
-        }
     }
 
     // Czekam az wszyscy klienci zakoncza zakupy
@@ -428,12 +500,6 @@ int main() {
 
     if (errno != ECHILD) {
         checkError(-1, "Blad czekania na klientow");
-    }
-    
-    if(stan_dyskontu->pid_kierownika > 0) {
-        while(kill(stan_dyskontu->pid_kierownika, 0) == 0) {
-            usleep(1000);
-        }
     }
 
     delete lista_klientow;
@@ -447,7 +513,7 @@ int main() {
     checkError( msgctl(msqid_kolejka_samo, IPC_RMID, NULL), "Blad zamkniecia kolejki_samoobslugowej" );
     checkError( msgctl(msqid_kolejka_stac1, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_1" );
     checkError( msgctl(msqid_kolejka_stac2, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
-    checkError( msgctl(msqid_kolejka_obsluga, IPC_RMID, NULL), "Blad zamkniecia kolejki stacjonarnej_2" );
+    checkError( msgctl(msqid_kolejka_obsluga, IPC_RMID, NULL), "Blad zamkniecia kolejki obslugi" );
 
     return 0;
 }

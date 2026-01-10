@@ -6,15 +6,17 @@ using namespace std;
 
 volatile sig_atomic_t czy_kasa_otwarta = 1; 
 
+int kasjer_sem_id = 0, sem_number = 0;
+
 void przerwij_prace(int sig) {
     // Przerwanie pracy poprzez wygenerowanie EINTR
     (void)sig;
 }
 
 void zamknij_kase(int) {
+    operacja_v(kasjer_sem_id, sem_number);
     czy_kasa_otwarta = 0;
 }
-
 
 int main(int, char * argv[]) {
     srand(time(0) + getpid());
@@ -28,7 +30,7 @@ int main(int, char * argv[]) {
     signal(SIGINT, zamknij_kase);
     signal(SIGTERM, zamknij_kase);
     
-    int sem_id = atoi(argv[1]);
+    kasjer_sem_id = atoi(argv[1]);
     int shmid_kasy = atoi(argv[2]);
     int msqid_kolejka_stac1 = atoi(argv[3]);
     int msqid_kolejka_stac2 = atoi(argv[4]);
@@ -50,16 +52,16 @@ int main(int, char * argv[]) {
     int id_kasy = nr_kasy == 6 ? msqid_kolejka_stac1 : msqid_kolejka_stac2;
 
     while(czy_kasa_otwarta) {
-        int sem_number = nr_kasy == ID_KASY_STACJONARNEJ_1 ? SEMAFOR_DZIALANIE_KASY_STAC1 : SEMAFOR_DZIALANIE_KASY_STAC2;
+        sem_number = nr_kasy == ID_KASY_STACJONARNEJ_1 ? SEMAFOR_DZIALANIE_KASY_STAC1 : SEMAFOR_DZIALANIE_KASY_STAC2;
         
-        operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+        operacja_p(kasjer_sem_id, SEMAFOR_STAN_DYSKONTU);
         int status_kasy = stan_dyskontu->status_kasy[nr_kasy];
-        operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+        operacja_v(kasjer_sem_id, SEMAFOR_STAN_DYSKONTU);
 
         int wiadomosci_w_kolejce = pobierz_ilosc_wiadomosci(id_kasy);
 
         if(status_kasy == 0 && wiadomosci_w_kolejce == 0) {
-            operacja_p(sem_id, sem_number);
+            operacja_p(kasjer_sem_id, sem_number);
             continue;
         }
 
@@ -76,9 +78,9 @@ int main(int, char * argv[]) {
         }
 
         if(status == -1) {
-            operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+            operacja_p(kasjer_sem_id, SEMAFOR_STAN_DYSKONTU);
             int dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[nr_kasy == 6 ? 1 : 2];
-            operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+            operacja_v(kasjer_sem_id, SEMAFOR_STAN_DYSKONTU);
             if(!czy_kasa_otwarta) break;
 
             if(errno == EINTR && (dlugosc_kolejki > 0)) {
@@ -87,11 +89,11 @@ int main(int, char * argv[]) {
             if(errno == EIDRM || errno == EINVAL) break;
             if(errno == EINTR) {
                 komunikat << "[KASJER-" << getpid() << "] " << "Idzie na przerwe"<< "\n";
-                operacja_p(sem_id, SEMAFOR_ILOSC_KAS);
+                operacja_p(kasjer_sem_id, SEMAFOR_ILOSC_KAS);
 
-                operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
+                operacja_p(kasjer_sem_id, SEMAFOR_STAN_DYSKONTU);
                 stan_dyskontu->status_kasy[nr_kasy] = 0;
-                operacja_v(sem_id, SEMAFOR_STAN_DYSKONTU);
+                operacja_v(kasjer_sem_id, SEMAFOR_STAN_DYSKONTU);
                 continue;
             }
         }

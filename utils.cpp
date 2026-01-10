@@ -66,7 +66,13 @@ void ustaw_poczatkowe_wartosci_semaforow(int semid) {
     checkError(semctl(semid, SEMAFOR_STAN_DYSKONTU, SETVAL, 1), "Bledne ustawienie wartosci dla semafora SEMAFOR_OUTPUT");
     checkError(semctl(semid, SEMAFOR_DZIALANIE_KASY_STAC1, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_KASY_STAC1");
     checkError(semctl(semid, SEMAFOR_DZIALANIE_KASY_STAC2, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_KASY_STAC2");
-    if( MAX_ILOSC_KLIENTOW <= 32767 ) {
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_1, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_1");
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_2, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_2");
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_3, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_3");
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_4, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_4");
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_5, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_5");
+    checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_6, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_6");
+        if( MAX_ILOSC_KLIENTOW <= 32767 ) {
         checkError(semctl(semid, SEMAFOR_MAX_ILOSC_KLIENTOW, SETVAL, MAX_ILOSC_KLIENTOW), "Bledne ustawienie wartosci dla semafora SEMAFOR_MAX_ILOSC_KLIENTOW");
     } else {
         checkError(-1, "Podano wartosc semafora ponad limit");
@@ -77,7 +83,7 @@ void operacja_p(int semId, int semNum) {
     struct sembuf operacjaP;
     operacjaP.sem_num = semNum;
     operacjaP.sem_op = -1;
-    operacjaP.sem_flg = 0;
+    operacjaP.sem_flg = SEM_UNDO;
     while(semop(semId, &operacjaP, 1) == -1) {
         if(errno == EINTR) {
             continue;
@@ -94,7 +100,7 @@ void operacja_v(int semId, int semNum) {
     struct sembuf operacjaV;
     operacjaV.sem_num = semNum;
     operacjaV.sem_op = 1;
-    operacjaV.sem_flg = 0;
+    operacjaV.sem_flg = SEM_UNDO;
     while(semop(semId, &operacjaV, 1) == -1) {
         if(errno == EINTR) {
             continue;
@@ -231,14 +237,14 @@ ListaKlientow::ListaKlientow(DaneListyKlientow * klienci_pamiec, int pierwsze_wy
 }
 
 int ListaKlientow::dodaj_klienta_do_listy(int pid_klienta) {
-        if(klienci->ilosc >= 0 && klienci->ilosc < MAX_ILOSC_KLIENTOW) {
-            klienci->lista_klientow[klienci->ilosc++] = pid_klienta;
-        } else {
-            komunikat << "[ERROR] Za duzo ludzi w skelpie\n";
-            return 0;
-        }
-        return 1;
+    if(klienci->ilosc >= 0 && klienci->ilosc < MAX_ILOSC_KLIENTOW) {
+        klienci->lista_klientow[klienci->ilosc++] = pid_klienta;
+    } else {
+        komunikat << "[ERROR] Za duzo ludzi w skelpie\n";
+        return 0;
     }
+    return 1;
+}
 
 void ListaKlientow::usun_klienta_z_listy(int pid_klienta) {
         if(pid_klienta < 0) {
@@ -453,6 +459,19 @@ int findInexOfPid(int pid, StanDyskontu * stan) {
     }
     return res;
 };
+
+int znajdzSemaforKasy(int nr_kasy_szukanej) {
+    switch (nr_kasy_szukanej) {
+        case 0: return SEMAFOR_DZIALANIE_SAMOOBLSUGA_1;
+        case 1: return SEMAFOR_DZIALANIE_SAMOOBLSUGA_2;
+        case 2: return SEMAFOR_DZIALANIE_SAMOOBLSUGA_3;
+        case 3: return SEMAFOR_DZIALANIE_SAMOOBLSUGA_4;
+        case 4: return SEMAFOR_DZIALANIE_SAMOOBLSUGA_5; 
+        case 5: return SEMAFOR_DZIALANIE_SAMOOBLSUGA_6;
+
+        default: return -1;
+    }
+}
 
 int wyswietl_cene_produktu(const char * produkt) {
     for(int i=0;i < (int)products.size(); i++) {
