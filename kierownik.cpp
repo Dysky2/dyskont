@@ -63,6 +63,7 @@ int main(int argc, char * argv[]) {
             cin.clear();
             cin.ignore(1000, '\n');
             komunikat << "[Kierownik] Musisz podac liczbe!\n";
+            continue;
         }
 
         int kasa = 0;
@@ -120,7 +121,7 @@ int main(int argc, char * argv[]) {
                                 komunikat_wyswietlony = true;
                             }
 
-                            sleep(3);
+                            usleep(3000000);
 
                             operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                             dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[1];
@@ -159,7 +160,7 @@ int main(int argc, char * argv[]) {
                                 komunikat_wyswietlony = true;
                             }
 
-                            sleep(3);
+                            usleep(3000000);
 
                             operacja_p(sem_id, SEMAFOR_STAN_DYSKONTU);
                             dlugosc_kolejki = stan_dyskontu->dlugosc_kolejki[2];

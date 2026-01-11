@@ -2,13 +2,12 @@
 
 ### Wersja i dystrybucje
 
-Distributor ID:     Ubuntu \
-Release:            22.04 \
-Virtualization:     wsl \
-Operating System:   Ubuntu 22.04.5 LTS \
-Kernel:             Linux 6.6.87.2-microsoft-standard-WSL2 \
-Architecture:       x86-64 \
-g++ (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0
+|      |       |
+| :--- | :--- |
+| **Operating System:** | Ubuntu 22.04.5 LTS (WSL2) |
+| **Kernel:** | Linux 6.6.87.2-microsoft-standard-WSL2 |
+| **Architecture:** | x86-64 |
+| **g++** | (Ubuntu 11.4.0-1ubuntu1~22.04.2) 11.4.0 |
 
 ### Wymagania wstępne
 
@@ -198,7 +197,6 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
         18:45:05 | [KASA-101051] Koniec
         18:45:05 | [OBSLUGA] Koncze prace 
 
-
         ipcs -a
 
         ------ Message Queues --------
@@ -238,6 +236,24 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
         18:53:27 | [KASA-103756] Koniec
         18:53:27 | [KASA-103759] Koniec
         18:53:27 | [KASJER-103762] Zamykam kase stacjonarna
+        ```
+    * Wynik: [**Zaliczony**]
+* **Test 8 (Zmiana kasy)**:
+    * Opis: Klient dynamicznie zmienia kolejkę na najkorzystniejszą w reakcji na tłok lub otwarcie nowej kasy.
+    * Oczekiwany rezultat: Klient poprawnie przepina się do nowej kolejki, aktualizując stan w pamięci dzielonej.
+    * Logi:
+        ```
+        18:51:24 | [KLIENT-333922] Zmienia kase z 0 do 1
+        18:51:24 | [KLIENT] Ilosc ludzi w kolejce 13 1 0 
+        18:51:24 | [KLIENT-334035] Zmienia kase z 0 do 1
+        18:51:36 | [Kierownik] Zarzadam otwarcie kasy stacjonarnej 2
+        18:51:33 | [KLIENT-334140] Zmienia kase z 0 do 1
+        18:51:33 | [KLIENT-334334] Staje do kolejki 0
+        18:51:34 | [KLIENT-334301] Staje do kolejki 0
+        18:51:35 | [KLIENT-334114] Zmienia kase z 0 do 1
+        18:51:36 | [KLIENT-334035] Ide do kasy nr: 1
+        18:51:36 | [KLIENT-334034] Zmienia kase z 0 do 2
+        18:51:36 | [KLIENT-334113] Zmienia kase z 0 do 2
         ```
     * Wynik: [**Zaliczony**]
 
