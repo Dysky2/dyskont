@@ -60,9 +60,9 @@
 // -- CZAS AKTYWNOSCI --
 
 #define CZAS_KASOWANIA_PRODUKTOW 4
-#define CZAS_ROBIENIA_ZAKUPOW 12
+#define CZAS_ROBIENIA_ZAKUPOW 7
 #define CZAS_WPUSZANIA_NOWYCH_KLIENTOW 4
-#define CZAS_DZIALANIA_OBSLUGI 6
+#define CZAS_DZIALANIA_OBSLUGI 5
 
 // -- SEMAFORY --
 
@@ -117,9 +117,12 @@ key_t utworz_klucz(const char znak);
 // 2 -> semafor do koleki stacjonarnej 2
 // 3 -> semafor liczaczy ilosc klientow w sklepie 
 // 4 -> semafor odpowiadajacy ile kas aktualnie jest otwartych
-// 5 -> semfaor czy obsluga udziela komus pomocy
-// 6 -> semfor dla listy klientow ktorzy sa w sklepie ale nie w kolejce
-// 7 -> semfor odpowiedzialny za poprawna kolejnosc wypisania komunikatow
+// 5 -> semafor czy obsluga udziela komus pomocy
+// 6 -> semafor dla listy klientow ktorzy sa w sklepie ale nie w kolejce
+// 7 -> semafor odpowiedzialny za poprawna kolejnosc wypisania komunikatow
+// 8 -> semafor odpowiedzialny za dostep do pamieci dzielonej StanDyskontu
+// 9-16 -> semafory odpowiedzialne za kasy
+// 17 -> semafor do maksymalnej ilość klientow w dyskoncie
 int utworz_grupe_semaforowa();
 
 // ustawien wartosci poczatkowe dla wszystkich semaforów
@@ -130,6 +133,12 @@ void operacja_p(int semId, int semNum);
 
 // Podniesienie danego semafora o 1
 void operacja_v(int semId, int semNum);
+
+// Opuszczenie danego semafora o 1 z flaga 0
+void operacja_p_bez_undo(int semId, int semNum);
+
+// Podniesienie danego semafora o 1 z flaga 0
+void operacja_v_bez_undo(int semId, int semNum);
 
 // Tworze katalog z aktualna data na logi
 std::string utworz_katalog_na_logi();
@@ -173,22 +182,22 @@ struct DaneListyKlientow {
     int lista_klientow[MAX_ILOSC_KLIENTOW];
 };
 
-struct AtomicLogger {
+struct WpisDoLogu {
     std::stringstream bufor;
     struct tm aktualny_czas;
     char bufor_czas[64];
 
-    AtomicLogger();
-    ~AtomicLogger();
+    WpisDoLogu();
+    ~WpisDoLogu();
 
     template<typename T>
-    AtomicLogger& operator<<(const T& wartosc) {
+    WpisDoLogu& operator<<(const T& wartosc) {
         bufor << wartosc;
         return *this;
     }
 };
 
-#define komunikat AtomicLogger()
+#define komunikat WpisDoLogu()
 
 // -- KLASY --
 

@@ -51,6 +51,9 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
+    dane_klientow->ilosc = 0; 
+    memset(dane_klientow->lista_klientow, 0, sizeof(dane_klientow->lista_klientow));
+    
     // Tworze pamiec dzielona dla stanu calego dyskontu
     int shmId_kasy = checkError( shmget(utworz_klucz('C'), sizeof(StanDyskontu), IPC_CREAT|0600), "Blad tworzenia pamieci wspoldzielonej");
 
@@ -205,7 +208,7 @@ int main() {
 
         sleep(randomTime(CZAS_WPUSZANIA_NOWYCH_KLIENTOW / simulation_speed));
 
-        operacja_p(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+        operacja_p_bez_undo(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
 
         if (time(NULL) >= dyskont_koniec || ewakuacja) {
             operacja_v(dyskont_sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW); 

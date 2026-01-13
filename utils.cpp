@@ -72,7 +72,7 @@ void ustaw_poczatkowe_wartosci_semaforow(int semid) {
     checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_4, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_4");
     checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_5, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_5");
     checkError(semctl(semid, SEMAFOR_DZIALANIE_SAMOOBLSUGA_6, SETVAL, 0), "Bledne ustawienie wartosci dla semafora SEMAFOR_DZIALANIE_SAMOOBLSUGA_6");
-        if( MAX_ILOSC_KLIENTOW <= 32767 ) {
+    if( MAX_ILOSC_KLIENTOW <= (SHRT_MAX-1)) {
         checkError(semctl(semid, SEMAFOR_MAX_ILOSC_KLIENTOW, SETVAL, MAX_ILOSC_KLIENTOW), "Bledne ustawienie wartosci dla semafora SEMAFOR_MAX_ILOSC_KLIENTOW");
     } else {
         checkError(-1, "Podano wartosc semafora ponad limit");
@@ -113,6 +113,37 @@ void operacja_v(int semId, int semNum) {
     }
 }
 
+void operacja_p_bez_undo(int semId, int semNum) {
+    struct sembuf operacjaP;
+    operacjaP.sem_num = semNum;
+    operacjaP.sem_op = -1;
+    operacjaP.sem_flg = 0;
+    while(semop(semId, &operacjaP, 1) == -1) {
+        if(errno == EINTR) {
+            continue;
+        }
+        if(errno == EINVAL || errno == EIDRM) {
+            return; 
+        }
+        showError("Bledne obnizenie semafora w operacja_p");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void operacja_v_bez_undo(int semId, int semNum) {
+    struct sembuf operacjaV;
+    operacjaV.sem_num = semNum;
+    operacjaV.sem_op = 1;
+    operacjaV.sem_flg = 0;
+
+    while(semop(semId, &operacjaV, 1) == -1) {
+        if(errno == EINTR) continue;
+        if(errno == EINVAL || errno == EIDRM) return; 
+        showError("Bledne podniesienie semafora bez SEM_UNDO w operacja_v");
+        exit(EXIT_FAILURE);
+    }
+}
+
 std::string utworz_katalog_na_logi() {
     int log_status_katalog = mkdir("./Logi", 0700);
     if(log_status_katalog == -1) {
@@ -146,13 +177,13 @@ void ustaw_nazwe_katalogu(std::string nazwa) {
 
 // -- STRUKTURY --
 
-AtomicLogger::AtomicLogger() {
+WpisDoLogu::WpisDoLogu() {
     pobierz_aktualny_czas(&aktualny_czas);
     strftime(bufor_czas, 64, "%H:%M:%S | ", &aktualny_czas);
     bufor << bufor_czas;
 }
 
-AtomicLogger::~AtomicLogger() {
+WpisDoLogu::~WpisDoLogu() {
     std::string surowa_tresc = bufor.str();
 
     std::string nazwa_pliku;
@@ -247,37 +278,37 @@ int ListaKlientow::dodaj_klienta_do_listy(int pid_klienta) {
 }
 
 void ListaKlientow::usun_klienta_z_listy(int pid_klienta) {
-        if(pid_klienta < 0) {
-            showError("Nie ma klienta o takim pidzie w kolejce");
-            return;
-        }
-
-        int index_klienta = -1;
-        for(int i=0;i< klienci->ilosc;i++) {
-            if(pid_klienta == klienci->lista_klientow[i]) {
-                index_klienta = i;
-                break;
-            }
-       }
-
-       if(index_klienta != -1) {
-            for(int i=index_klienta; i < klienci->ilosc - 1; i++) {
-                klienci->lista_klientow[i] = klienci->lista_klientow[i + 1];
-            }
-            klienci->ilosc--;
-            klienci->lista_klientow[klienci->ilosc] = 0;
-       } else {
-            komunikat << "[ERROR] Nie ma takiego klienta na liscie\n";
-       }
+    if(pid_klienta < 0) {
+        showError("Nie ma klienta o takim pidzie w kolejce");
+        return;
     }
 
-void ListaKlientow::wyswietl_cala_liste() {
-        std::stringstream bufor;
-        for(int i=0;i<klienci->ilosc;i++) {
-            bufor << klienci->lista_klientow[i] << " ";
+    int index_klienta = -1;
+    for(int i=0;i< klienci->ilosc;i++) {
+        if(pid_klienta == klienci->lista_klientow[i]) {
+            index_klienta = i;
+            break;
         }
-        komunikat << bufor.str() << "\n";
-        bufor.clear();
+    }
+
+    if(index_klienta != -1) {
+        for(int i=index_klienta; i < klienci->ilosc - 1; i++) {
+            klienci->lista_klientow[i] = klienci->lista_klientow[i + 1];
+        }
+        klienci->ilosc--;
+        klienci->lista_klientow[klienci->ilosc] = 0;
+    } else {
+        komunikat << "[ERROR] Nie ma takiego klienta na liscie\n";
+    }
+}
+
+void ListaKlientow::wyswietl_cala_liste() {
+    std::stringstream bufor;
+    for(int i=0;i<klienci->ilosc;i++) {
+        bufor << klienci->lista_klientow[i] << " ";
+    }
+    komunikat << bufor.str() << "\n";
+    bufor.clear();
 }
 
 Kolejka::Kolejka(StanDyskontu * stan_dyskontu) {

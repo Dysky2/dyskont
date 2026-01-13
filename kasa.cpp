@@ -13,8 +13,8 @@ void hanlder_dla_eintr(int sig) {
 }
 
 void zamknij_kase(int) {
-    operacja_v(kasa_sem_id, znajdzSemaforKasy(nr_kasy));
     czy_kasa_otwarta = 0;
+    operacja_v(kasa_sem_id, znajdzSemaforKasy(nr_kasy));
 }
 
 int main(int argc, char * argv[]) {

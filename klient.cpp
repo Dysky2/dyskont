@@ -67,7 +67,7 @@ int main(int, char * argv[]) {
 
     if(stan_dyskontu == (void*) -1) {
         showError("[KLIENT] Bledne podlaczenie pamieci dzielonej stanu dyskontu");
-        operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+        operacja_v_bez_undo(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
         exit(EXIT_FAILURE);
     }
 
@@ -75,7 +75,7 @@ int main(int, char * argv[]) {
 
     if(dane_klientow == (void*) -1) {
         showError("[KLIENT] Bledne podlaczenie pamieci dzielonej danych klientow");
-        operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+        operacja_v_bez_undo(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
         exit(EXIT_FAILURE);
     }
 
@@ -83,7 +83,7 @@ int main(int, char * argv[]) {
 
     if(kolejka == (void*) -1) {
         showError("[KLIENT] Bledne podlaczenie pamieci dzielonej kolejki");
-        operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+        operacja_v_bez_undo(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
         exit(EXIT_FAILURE);
     }
 
@@ -91,7 +91,7 @@ int main(int, char * argv[]) {
 
     if(lista_klientow == (void*) -1) {
         showError("[KLIENT] Bledne podlaczenie pamieci dzielonej listy klientow");
-        operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+        operacja_v_bez_undo(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
         exit(EXIT_FAILURE);
     }
 
@@ -218,7 +218,12 @@ int main(int, char * argv[]) {
                     break;
                 } else {
                     operacja_v(sem_id, SEMAFOR_ILOSC_KAS);
-                    operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+                    operacja_v_bez_undo(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+
+                    operacja_p(sem_id, SEMAFOR_LISTA_KLIENTOW);
+                    lista_klientow->usun_klienta_z_listy(getpid());
+                    operacja_v(sem_id, SEMAFOR_LISTA_KLIENTOW);
+                    
                     showError("Bledne odebranie wiadomosci");
                     exit(EXIT_FAILURE);
                 }
@@ -292,12 +297,13 @@ int main(int, char * argv[]) {
         operacja_v(sem_id, aktualnyNr);
     }
 
-    operacja_v(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
 
     operacja_p(sem_id, SEMAFOR_LISTA_KLIENTOW);
     lista_klientow->usun_klienta_z_listy(getpid());
     operacja_v(sem_id, SEMAFOR_LISTA_KLIENTOW);
 
+    operacja_v_bez_undo(sem_id, SEMAFOR_MAX_ILOSC_KLIENTOW);
+    
     operacja_p(sem_id, SEMAFOR_ILOSC_KLIENTOW);
 
     komunikat << "[" << "KLIENT-" << getpid() << "] " << "WYCHODZI ZE SKLEPU" << "\n";

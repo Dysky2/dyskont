@@ -114,8 +114,8 @@ Zgodnie z wymaganiami, zaimplementowano własne funkcje do obsługi błędów:
 *  Funkcja `checkError(int result, const char * msg)` sprawdza wynik wywołania danej funkcji systemowej, pod polem `result`. Jeśli zwróci ona `-1`, wypisuje się wtedy błąd przy pomocy `perror()` z podanym komunikatem, i proces zostaje zakończony.
 * Dane wejściowe w `kierownik.cpp` są walidowane, aby zapobiec nieprawidłowemu wykonaniu (Podanie znaków zamiast cyfr).
 
-### 3.4. Synchronizacja wypisywania (AtomicLogger)
-Przy wielu procesach równoczesne pisanie na `stdout` powodowało "rozjeżdżanie się" tekstu. Zastosowano klasę AtomicLogger, która synchronizuje dostęp do terminala za pomocą semafora. Mechanizm działania opiera się na **semaforze** (`SEMAFOR_OUTPUT`), który chroni sekcję krytyczną odpowiedzialną za wypisanie danych. 
+### 3.4. Synchronizacja wypisywania (WpisDoLogu)
+Przy wielu procesach równoczesne pisanie na `stdout` powodowało "rozjeżdżanie się" tekstu. Zastosowano klasę WpisDoLogu, która synchronizuje dostęp do terminala za pomocą semafora. Mechanizm działania opiera się na **semaforze** (`SEMAFOR_OUTPUT`), który chroni sekcję krytyczną odpowiedzialną za wypisanie danych. 
 
 Każdy proces:
 1. Proces przygotowuje komunikat w buforze.
@@ -145,8 +145,11 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
     * Oczekiwany rezultat: System nie ulega awarii, dyskont poprawnie obsługuje każdego klienta, sprawdza czy żaden z limitów nie został przekroczony.
     * Logi: 
         ```
-        17:05:43 | [DYSKONT] wchodzi klient 70200
-        17:05:43 | [DYSKONT] Jest: 1000 klientow w dyskoncie
+        10:34:49 | [DYSKONT] Wchodzi klient 194827
+        10:34:49 | [DYSKONT] Jest: 999 klientow w dyskoncie
+        10:34:49 | [DYSKONT] Ilosc ludzi w kolejce 972 27 0
+        10:34:49 | [KLIENT-194827] Wchodzi do sklepu
+        10:34:49 | [KLIENT-194827] Staje do kolejki 0
         ```
     * Wynik: [**Zaliczony**]
 * **Test 2 (Otwarcie kas)**: 
