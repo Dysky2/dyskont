@@ -263,37 +263,37 @@ W projekcie zrealizowano elementy wymienione z punktu 5.3.d:
 ## 7. Wymagane funkcje systemowe i linki do kodu
 
 #### A. Tworzenie i obsługa plików:
-* `open()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L197]
-* `close()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L211]
-* `write()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L220]
+* `open()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L228]
+* `close()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L242]
+* `write()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L235]
 
 #### B. Tworzenie procesów: 
-* `fork()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L216]
-* `execl()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L219]
-* `exit()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/kasa.cpp#L327]
-* `wait()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L499]
+* `fork()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L219]
+* `execl()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L222]
+* `exit()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/kasa.cpp#L327]
+* `wait()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L502]
 
 #### C. Obsługa sygnałów:
-* `kill()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/kierownik.cpp#L185]
-* `signal()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L36]
+* `kill()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/kierownik.cpp#L185]
+* `signal()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L36]
 
 #### D. Synchronizacja procesów:
-* `ftok()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L40]
-* `semget()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L46]
-* `semctl()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L58]
-* `semop()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L87]
+* `ftok()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L40]
+* `semget()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L46]
+* `semctl()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L58]
+* `semop()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L87]
 
 #### E. Segmenty pamięci dzielonej:
-* `shmget()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L55]
-* `shmat()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L57]
-* `shmdt()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/kasa.cpp#L326]
-* `shmctl()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L511]
+* `shmget()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L58]
+* `shmat()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L60]
+* `shmdt()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/kasa.cpp#L326]
+* `shmctl()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L514]
 
 #### F. Kolejki komunikatów:
-* `msgget()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L82]
-* `msgsnd()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/klient.cpp#L201]
-* `msgrcv()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/kasa.cpp#L85]
-* `msgctl()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/dyskont.cpp#L513]
+* `msgget()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L85]
+* `msgsnd()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/klient.cpp#L201]
+* `msgrcv()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/kasa.cpp#L85]
+* `msgctl()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/dyskont.cpp#L516]
 
 #### G. Obsługa błędów:
-* `perror()`: [https://github.com/Dysky2/dyskont/blob/c4080519410816b44b5ea958ce372b29f04b832f/utils.cpp#L18]
+* `perror()`: [https://github.com/Dysky2/dyskont/blob/980e69838a863040e4b173a493e299ccaa3fd06f/utils.cpp#L18]
